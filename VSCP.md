@@ -151,6 +151,10 @@ Every packet starts with a uint8 defining what type of packet it is followed imm
 | Avatar | ~ | string | |
 | Username | ~ | string | |
 
+#### Notes
+
+- Every time a user receives the SMsgUserJoined for when they joined, a new timer for networking their position and rotation starts. You can technically get them to send their position as fast as you want with this for smother movement and rotation if you can time it right.
+
 ### SMsgUserLeft
 
 | Name | Bytes | Type | Description |
@@ -212,6 +216,7 @@ Every packet starts with a uint8 defining what type of packet it is followed imm
 | PrivateChat | 15 | 2 |
 | VcRegister | 16 | ? |
 | VoiceState | 18 | 1 |
+| ??? | 19 | ? |
 | ApplSpecific | 10000 | 0, 1, 2, 3, 4, 5, 6 |
 
 ### Message Common Strategies
@@ -236,14 +241,18 @@ Every packet starts with a uint8 defining what type of packet it is followed imm
 
 ### TransformUpdate
 
-| Name | Bytes | Type | Description |
-| --- | --- | --- | --- |
-| 1 | 4 | int32float | |
-| ... | | | |
-| 9 | 4 | int32float | |
-| X | 4 | int32float | |
-| Y | 4 | int32float | |
-| Z | 4 | int32float | |
+| Name | Bytes | Type |
+| --- | --- | --- |
+| 1 | 4 | int32float |
+| ... | | |
+| 9 | 4 | int32float |
+| X | 4 | int32float |
+| Y | 4 | int32float |
+| Z | 4 | int32float |
+
+#### Notes
+
+- TransformUpdate is a 4x3 matrix where the first 9 values make up the rotation matrix and the last three are a position offset.
 
 ### ChatSend
 
@@ -251,17 +260,36 @@ Every packet starts with a uint8 defining what type of packet it is followed imm
 | --- | --- | --- | --- |
 | Message | ~ | string | The user's name + ": " followed by their actual message. |
 
+### CharacterUpdate
+
+| Name | Bytes | Type |
+| --- | --- | --- |
+| Data | ~ | string |
+
+#### Notes
+
+- The data will look something like `sleep:0 1:000000000000:58:0:`.
+
+- The first part (sleep:0) tells whether the character is sleeping or not (1 for true, 0 for false)
+- The second part contains the character data, each part separated by a colon:
+    - The first value (1) is the number of the avatar.
+    - Next is the body parts's color and scale:
+        - Each body part has two values, the first value is the color, the second value is the scale.
+        - The amount of values depends on how much body parts the user's avatar has.
+    - After that is the minutes spent using that particular avatar (58)
+    - The final value is user's medal, which is awarded if they have spent enough time using that avatar (none = 0, happy = 1, lucky = 2, lovely = 3).
+
 ### NameChange
 
-| Name | Bytes | Type | Description |
-| --- | --- | --- | --- |
-| Name | ~ | string | |
+| Name | Bytes | Type |
+| --- | --- | --- |
+| Name | ~ | string |
 
 ### AvatarChange
 
-| Name | Bytes | Type | Description |
-| --- | --- | --- | --- |
-| Avatar | ~ | string | |
+| Name | Bytes | Type |
+| --- | --- | --- |
+| Avatar | ~ | string |
 
 ### ApplSpecific
 
@@ -279,4 +307,10 @@ Every packet starts with a uint8 defining what type of packet it is followed imm
 - If the id in MsgCommon is `-9999`, then there is seperate behaviour for handling the packet. Most notibly strategy 2 is now for requesting to a master client.
 
 - The master client is a (randomly assigned?) client that is responsible for responding to certain ApplSpecific messages (startAreaRequest and broadcastRequest are the only ones i've seen so far). I assume it uses these to sync vrml events. If unhandled things like the intro camera animation in coast will not play.
+
+# Credits
+
+- [LeadRDRK](https://github.com/LeadRDRK), for the original packet structure.
+
+- [barra](https://barrarchiverio.7m.pl/), for character update data.
 

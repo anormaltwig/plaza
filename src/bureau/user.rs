@@ -26,6 +26,7 @@ pub struct User {
 }
 
 impl User {
+	/// Creates a new user from a TcpStream and i32 id.
 	pub fn new(socket: TcpStream, id: i32) -> io::Result<User> {
 		socket.set_nonblocking(true)?;
 		Ok(User {

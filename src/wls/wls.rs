@@ -8,10 +8,14 @@ use std::{
 
 use crate::bureau::{Bureau, BureauOptions};
 
+#[allow(dead_code)]
 pub struct WLS {
 	bureaus: HashMap<String, Bureau>,
 }
 
+// !!!Not Finished!!!
+
+#[allow(dead_code)]
 impl WLS {
 	pub fn start(port: u16) -> io::Result<()> {
 		let listener = TcpListener::bind(format!("0.0.0.0:{}", port))?;
@@ -76,12 +80,12 @@ impl WLS {
 				}
 
 				// World Name
-				let wrl = match split.next() {
+				let _wrl = match split.next() {
 					Some(wrl) => wrl,
 					None => continue,
 				};
 
-				let bureau = Bureau::new(
+				let _bureau = Bureau::new(
 					"0.0.0.0:5126",
 					BureauOptions {
 						max_players: 1,

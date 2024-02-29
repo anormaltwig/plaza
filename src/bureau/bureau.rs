@@ -29,6 +29,7 @@ pub struct BureauHandle {
 }
 
 impl BureauHandle {
+	#[allow(dead_code)] // Remove when done implementing WLS.
 	pub fn close(&mut self) {
 		_ = self.signaller.send(BureauSignal::Close);
 	}
@@ -52,6 +53,7 @@ pub struct Bureau {
 }
 
 impl Bureau {
+	/// Starts a new bureau and returns a speacial handle for its thread.
 	pub fn new<A>(addr: A, options: BureauOptions) -> io::Result<BureauHandle>
 	where
 		A: ToSocketAddrs,
@@ -237,8 +239,8 @@ impl Bureau {
 	/* Section Types */
 
 	fn general_message(&self, user: &User, packet: &[u8]) -> Option<usize> {
-		let id1 = packet.read_i32(1);
-		let id2 = packet.read_i32(5);
+		// let id1 = packet.read_i32(1);
+		// let id2 = packet.read_i32(5);
 		let opcode = packet.read_u32(9);
 		let size = packet.read_u32(13);
 
@@ -250,7 +252,7 @@ impl Bureau {
 
 		match opcode {
 			0 => self.cmsg_new_user(user, body),
-			6 => self.msg_common(user, id1, id2, body),
+			6 => self.msg_common(user, body),
 			7 => self.cmsg_state_change(user, body),
 			_ => return None,
 		}
@@ -409,7 +411,7 @@ impl Bureau {
 		self.broadcast_user_count()
 	}
 
-	fn msg_common(&self, user: &User, id1: i32, id2: i32, body: &[u8]) {
+	fn msg_common(&self, user: &User, body: &[u8]) {
 		if body.len() < 10 {
 			return;
 		}
@@ -426,7 +428,11 @@ impl Bureau {
 			13 => self.name_change(user, content),
 			14 => self.avatar_change(user, content),
 			15 => self.private_chat(user, id, content),
-			_ => self.appl_specific(user, id, id1, id2, strategy, content),
+
+			// Unknown or useless
+			16..=19 => (),
+
+			_ => self.appl_specific(user, id, strategy, content),
 		}
 	}
 
@@ -576,38 +582,7 @@ impl Bureau {
 		));
 	}
 
-	fn appl_specific(
-		&self,
-		user: &User,
-		id: i32,
-		id1: i32,
-		id2: i32,
-		strategy: u8,
-		content: &[u8],
-	) {
-		let len = content.len();
-		if len < 2 {
-			return;
-		}
-
-		let n = content[0];
-		let method = content.read_string(1);
-		if len < 1 + method.len() + 1 {
-			return;
-		}
-
-		let strarg = content.read_string(1 + method.len() + 1);
-		if len < 1 + method.len() + 1 + strarg.len() + 1 + 4 {
-			return;
-		}
-
-		let intarg = content.read_i32(1 + method.len() + 1 + strarg.len() + 1);
-
-		println!(
-			"[{} -> {} - ({}, {})] {} | {} | {}(\"{}\", {})",
-			user.id, id, id1, id2, n, strategy, method, strarg, intarg
-		);
-
+	fn appl_specific(&self, user: &User, id: i32, strategy: u8, content: &[u8]) {
 		let master = match self.users.iter().next() {
 			Some((_id, user)) => user,
 			None => return,
