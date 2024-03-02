@@ -291,6 +291,16 @@ Every packet starts with a uint8 defining what type of packet it is followed imm
 | --- | --- | --- |
 | Avatar | ~ | string |
 
+### PrivateChat
+
+| Name | Bytes | Type | Description |
+| BroadcastId | 4 | int32 | The BroadcastId of the user who sent the message. |
+| Message | ~ | string | |
+
+#### Notes
+
+- The id in the MsgCommon header is the id of the user the message is to be sent to.
+
 ### ApplSpecific
 
 | Name | Bytes | Type | Description |

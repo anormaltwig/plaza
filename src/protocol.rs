@@ -1,4 +1,4 @@
-use crate::core::math::Vector3;
+use crate::math::Vector3;
 
 #[allow(dead_code)]
 #[repr(u32)]
@@ -34,7 +34,6 @@ pub trait ByteReader {
 	fn read_string(&self, start: usize) -> String;
 	fn read_f32(&self, start: usize) -> f32;
 	fn read_u32(&self, start: usize) -> u32;
-	fn read_u16(&self, start: usize) -> u16;
 	fn read_u8(&self, start: usize) -> u8;
 	fn read_i32(&self, start: usize) -> i32;
 	fn read_i8(&self, start: usize) -> i8;
@@ -76,10 +75,6 @@ impl ByteReader for [u8] {
 		])
 	}
 
-	fn read_u16(&self, start: usize) -> u16 {
-		(self[start] as u16) << 8 | (self[start + 1] as u16)
-	}
-
 	fn read_u8(&self, start: usize) -> u8 {
 		self[start]
 	}
@@ -100,17 +95,17 @@ impl ByteReader for [u8] {
 
 /// Easily write values to byte vector for networking.
 /// All functions are Big Endian.
-pub struct ByteStream {
+pub struct ByteWriter {
 	pub bytes: Vec<u8>,
 }
 
 #[allow(dead_code)]
-impl ByteStream {
-	pub fn new() -> ByteStream {
-		ByteStream { bytes: Vec::new() }
+impl ByteWriter {
+	pub fn new() -> ByteWriter {
+		ByteWriter { bytes: Vec::new() }
 	}
 
-	pub fn general_message(id1: i32, id2: i32, opcode: Opcode, content: &ByteStream) -> ByteStream {
+	pub fn general_message(id1: i32, id2: i32, opcode: Opcode, content: &ByteWriter) -> ByteWriter {
 		let mut stream = Self::new();
 		stream.write_u8(0);
 		stream.write_i32(id1);
@@ -122,7 +117,7 @@ impl ByteStream {
 		stream
 	}
 
-	pub fn position_update(id: i32, pos: &Vector3) -> ByteStream {
+	pub fn position_update(id: i32, pos: &Vector3) -> ByteWriter {
 		let mut stream = Self::new();
 		stream.write_u8(2);
 		stream.write_i32(id);
@@ -145,8 +140,8 @@ impl ByteStream {
 		id3: i32,
 		msg_type: MsgCommon,
 		strategy: u8,
-		content: &ByteStream,
-	) -> ByteStream {
+		content: &ByteWriter,
+	) -> ByteWriter {
 		let mut common = Self::new();
 		common.write_i32(id3);
 		common.write_u32(msg_type as u32);
