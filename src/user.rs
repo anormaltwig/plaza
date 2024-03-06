@@ -7,11 +7,11 @@ use std::{
 
 use crate::{
 	math::{Mat3, Vector3},
-	protocol::{ByteReader, ByteWriter, Opcode},
+	protocol::{ByteReader, ByteWriter, MsgCommon, Opcode},
 };
 
 pub enum UserEvent {
-	NewUser,
+	NewUser(String, String),
 	StateChange,
 	PositionUpdate(Vector3),
 	TransformUpdate(Mat3, Vector3),
@@ -65,19 +65,39 @@ impl User {
 
 	pub fn set_pos(&self, pos: &Vector3) {
 		self.internal.borrow_mut().position.set(pos.x, pos.y, pos.z);
+		self.send(&ByteWriter::position_update(self.id, pos));
 	}
 	pub fn get_pos(&self) -> Vector3 {
 		self.internal.borrow().position.clone()
 	}
 
-	/*
+	/// Running this function before a user has chance to send their position will cause them to go to the world origin.
 	pub fn set_rot(&self, rot: Mat3) {
-		self.internal.borrow_mut().rotation = rot;
+		let mut content = ByteWriter::new();
+		for i in 0..9 {
+			content = content.write_f32(rot.data[i]);
+		}
+
+		let mut internal = self.internal.borrow_mut();
+		internal.rotation = rot;
+		content = content
+			.write_f32(internal.position.x)
+			.write_f32(internal.position.y)
+			.write_f32(internal.position.z);
+		drop(internal);
+
+		self.send(&ByteWriter::message_common(
+			self.id,
+			self.id,
+			self.id,
+			MsgCommon::TransformUpdate,
+			2,
+			&content,
+		));
 	}
 	pub fn get_rot(&self) -> Mat3 {
 		self.internal.borrow().rotation.clone()
 	}
-	*/
 
 	pub fn set_name(&self, name: String) {
 		self.internal.borrow_mut().username = name
@@ -112,6 +132,17 @@ impl User {
 	}
 	pub fn get_aura(&self) -> HashSet<i32> {
 		self.internal.borrow_mut().aura.clone()
+	}
+
+	pub fn send_msg(&self, msg: &str) {
+		self.send(&ByteWriter::message_common(
+			self.id,
+			self.id,
+			self.id,
+			MsgCommon::ChatSend,
+			0,
+			&ByteWriter::new().write_string(msg),
+		));
 	}
 
 	pub fn send(&self, stream: &ByteWriter) {
@@ -198,15 +229,13 @@ impl User {
 			return None;
 		}
 
-		let pos = Vector3::new(
+		self.internal.borrow_mut().position.set(
 			packet.read_f32(13),
 			packet.read_f32(17),
 			packet.read_f32(21),
 		);
 
-		self.set_pos(&pos);
-
-		Some((27, UserEvent::PositionUpdate(pos)))
+		Some((27, UserEvent::PositionUpdate(self.get_pos())))
 	}
 
 	/* General Message Receivers */
@@ -219,11 +248,10 @@ impl User {
 
 		let avatar = body.read_string(username.len() + 1);
 
-		self.set_name(username);
-		self.set_avatar(avatar);
+		self.set_name(username.clone());
+		self.set_avatar(avatar.clone());
 
-		let mut client_id = ByteWriter::new();
-		client_id.write_i32(self.id);
+		let client_id = ByteWriter::new().write_i32(self.id);
 		self.send(&ByteWriter::general_message(
 			0,
 			self.id,
@@ -231,8 +259,7 @@ impl User {
 			&client_id,
 		));
 
-		let mut unnamed1 = ByteWriter::new();
-		unnamed1.write_u8(1);
+		let unnamed1 = ByteWriter::new().write_u8(1);
 		self.send(&ByteWriter::general_message(
 			self.id,
 			self.id,
@@ -240,11 +267,11 @@ impl User {
 			&unnamed1,
 		));
 
-		let mut user_joined = ByteWriter::new();
-		user_joined.write_i32(self.id);
-		user_joined.write_i32(self.id);
-		user_joined.write_string(&self.get_avatar());
-		user_joined.write_string(&self.get_name());
+		let user_joined = ByteWriter::new()
+			.write_i32(self.id)
+			.write_i32(self.id)
+			.write_string(&self.get_avatar())
+			.write_string(&self.get_name());
 		self.send(&ByteWriter::general_message(
 			self.id,
 			self.id,
@@ -252,8 +279,7 @@ impl User {
 			&user_joined,
 		));
 
-		let mut broadcast_id = ByteWriter::new();
-		broadcast_id.write_i32(self.id);
+		let broadcast_id = ByteWriter::new().write_i32(self.id);
 		self.send(&ByteWriter::general_message(
 			self.id,
 			self.id,
@@ -261,7 +287,7 @@ impl User {
 			&broadcast_id,
 		));
 
-		Some(UserEvent::NewUser)
+		Some(UserEvent::NewUser(username, avatar))
 	}
 
 	fn msg_common(&self, body: &[u8]) -> Option<UserEvent> {

@@ -42,8 +42,8 @@ The first packet sent by a connected client contains "hello" as well as two `uin
 | Name | Bytes | Type | Description |
 | --- | --- | --- | --- |
 | Hello | 5 | data | Always `hello` |
-| ??? | 1 | uint8 | Probably browser version major |
-| ??? | 1 | uint8 | Probably browser version minor |
+| VscpVerMajor | 1 | int8 | |
+| VscpVerMinor | 1 | int8 | |
 
 #### Hello (Server Response)
 

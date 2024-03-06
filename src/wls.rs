@@ -1,7 +1,7 @@
 use std::{
 	collections::HashMap,
 	io::{self, Read, Write},
-	net::TcpListener,
+	net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener},
 	thread,
 	time::{Duration, SystemTime},
 };
@@ -18,7 +18,8 @@ pub struct WLS {
 #[allow(dead_code)]
 impl WLS {
 	pub fn start(port: u16) -> io::Result<()> {
-		let listener = TcpListener::bind(format!("0.0.0.0:{}", port))?;
+		let listener =
+			TcpListener::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), port))?;
 		listener.set_nonblocking(true)?;
 
 		let mut connecting = Vec::new();

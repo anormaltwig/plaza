@@ -106,30 +106,29 @@ impl ByteWriter {
 	}
 
 	pub fn general_message(id1: i32, id2: i32, opcode: Opcode, content: &ByteWriter) -> ByteWriter {
-		let mut stream = Self::new();
-		stream.write_u8(0);
-		stream.write_i32(id1);
-		stream.write_i32(id2);
-		stream.write_u32(opcode as u32);
-		stream.write_u32(content.bytes.len() as u32);
+		let mut stream = Self::new()
+			.write_u8(0)
+			.write_i32(id1)
+			.write_i32(id2)
+			.write_u32(opcode as u32)
+			.write_u32(content.bytes.len() as u32);
 		stream.bytes.extend(&content.bytes);
 
 		stream
 	}
 
 	pub fn position_update(id: i32, pos: &Vector3) -> ByteWriter {
-		let mut stream = Self::new();
-		stream.write_u8(2);
-		stream.write_i32(id);
-		stream.write_i32(id);
-		stream.write_i32(id);
-		stream.write_f32(pos.x);
-		stream.write_f32(pos.y);
-		stream.write_f32(pos.z);
-
-		// ???
-		stream.write_u8(1);
-		stream.write_u8(0);
+		let stream = Self::new()
+			.write_u8(2)
+			.write_i32(id)
+			.write_i32(id)
+			.write_i32(id)
+			.write_f32(pos.x)
+			.write_f32(pos.y)
+			.write_f32(pos.z)
+			// ???
+			.write_u8(1)
+			.write_u8(0);
 
 		stream
 	}
@@ -142,63 +141,79 @@ impl ByteWriter {
 		strategy: u8,
 		content: &ByteWriter,
 	) -> ByteWriter {
-		let mut common = Self::new();
-		common.write_i32(id3);
-		common.write_u32(msg_type as u32);
-		common.write_u8(strategy);
-		common.write_arr(&content.bytes);
+		let common = Self::new()
+			.write_i32(id3)
+			.write_u32(msg_type as u32)
+			.write_u8(strategy)
+			.write_arr(&content.bytes);
 
 		Self::general_message(id1, id2, Opcode::MsgCommon, &common)
 	}
 
-	pub fn write_f32(&mut self, n: f32) {
+	pub fn write_f32(self, n: f32) -> Self {
 		self.write_i32((n * (0xFFFF as f32)) as i32)
 	}
 
-	pub fn write_i32(&mut self, n: i32) {
+	pub fn write_i32(mut self, n: i32) -> Self {
 		for b in n.to_be_bytes() {
 			self.bytes.push(b);
 		}
+
+		self
 	}
 
-	pub fn write_i16(&mut self, n: i16) {
+	pub fn write_i16(mut self, n: i16) -> Self {
 		for b in n.to_be_bytes() {
 			self.bytes.push(b);
 		}
+
+		self
 	}
 
-	pub fn write_i8(&mut self, n: i8) {
+	pub fn write_i8(mut self, n: i8) -> Self {
 		self.bytes.push(n as u8);
+
+		self
 	}
 
-	pub fn write_u32(&mut self, n: u32) {
+	pub fn write_u32(mut self, n: u32) -> Self {
 		for b in n.to_be_bytes() {
 			self.bytes.push(b);
 		}
+
+		self
 	}
 
-	pub fn write_u16(&mut self, n: u16) {
+	pub fn write_u16(mut self, n: u16) -> Self {
 		for b in n.to_be_bytes() {
 			self.bytes.push(b);
 		}
+
+		self
 	}
 
-	pub fn write_u8(&mut self, n: u8) {
+	pub fn write_u8(mut self, n: u8) -> Self {
 		self.bytes.push(n);
+
+		self
 	}
 
 	/// Write every byte of `arr` to the stream.
-	pub fn write_arr(&mut self, arr: &[u8]) {
+	pub fn write_arr(mut self, arr: &[u8]) -> Self {
 		for b in arr {
 			self.bytes.push(*b);
 		}
+
+		self
 	}
 
 	/// Writes a string to the stream that's terminated by null.
-	pub fn write_string(&mut self, s: &String) {
+	pub fn write_string(mut self, s: &str) -> Self {
 		for b in s.as_bytes() {
 			self.bytes.push(*b);
 		}
 		self.bytes.push(0); // Append null char.
+
+		self
 	}
 }

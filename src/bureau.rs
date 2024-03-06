@@ -1,13 +1,16 @@
 use std::{
+	cell::RefCell,
 	collections::HashMap,
 	io::{self, Read, Write},
 	net::{TcpListener, ToSocketAddrs},
+	rc::Rc,
 	sync::mpsc::{self, Receiver, Sender},
 	thread::{self, JoinHandle},
 	time::{Duration, SystemTime},
 };
 
 use crate::{
+	lua_api::LuaApi,
 	math::{Mat3, Vector3},
 	protocol::{ByteWriter, MsgCommon, Opcode},
 	user::{User, UserEvent},
@@ -30,25 +33,26 @@ pub struct BureauHandle {
 impl BureauHandle {
 	#[allow(dead_code)] // Remove when done implementing WLS.
 	pub fn close(&mut self) {
-		_ = self.signaller.send(BureauSignal::Close);
+		let _ = self.signaller.send(BureauSignal::Close);
 	}
 
-	pub fn join(mut self) {
+	pub fn join(mut self) -> thread::Result<()> {
 		self.handle
 			.take()
 			.expect("Tried to join invalid bureau.")
 			.join()
-			.expect("Failed to join thread");
 	}
 }
 
 pub struct Bureau {
-	users: HashMap<i32, User>,
+	users: Rc<RefCell<HashMap<i32, User>>>,
 	user_index: u16,
 
 	listener: TcpListener,
 	receiver: Receiver<BureauSignal>,
 	options: BureauOptions,
+
+	lua_api: LuaApi,
 }
 
 impl Bureau {
@@ -62,16 +66,27 @@ impl Bureau {
 
 		let (signaller, receiver) = mpsc::channel::<BureauSignal>();
 
-		let bureau = Bureau {
-			users: HashMap::new(),
-			user_index: 0,
+		let handle = thread::spawn(|| {
+			let users = Rc::new(RefCell::new(HashMap::new()));
+			let lua_api = match LuaApi::new(users.clone()) {
+				Ok(v) => v,
+				Err(e) => {
+					panic!("Failed to create lua api. {}", e);
+				}
+			};
 
-			listener,
-			receiver,
-			options,
-		};
+			Bureau {
+				users,
+				user_index: 0,
 
-		let handle = thread::spawn(move || bureau.run());
+				listener,
+				receiver,
+				options,
+
+				lua_api,
+			}
+			.run()
+		});
 
 		Ok(BureauHandle {
 			handle: Some(handle),
@@ -90,6 +105,8 @@ impl Bureau {
 			}
 
 			let now = SystemTime::now();
+
+			self.lua_api.think();
 
 			if let Ok((socket, _addr)) = self.listener.accept() {
 				if let Ok(()) = socket.set_nonblocking(true) {
@@ -156,19 +173,24 @@ impl Bureau {
 				}
 
 				if let Ok(user) = User::new(socket, id) {
-					self.users.insert(id, user);
+					self.users.borrow_mut().insert(id, user);
 				}
 			}
 
 			// Handle connected users.
-			for (_id, user) in &self.users {
+			for (_id, user) in self.users.borrow().iter() {
 				match user.poll() {
 					Some(events) => {
 						for event in events {
 							match event {
-								UserEvent::NewUser => self.broadcast_user_count(),
+								UserEvent::NewUser(name, avatar) => {
+									self.lua_api.new_user(user, &name, &avatar);
+									self.broadcast_user_count()
+								},
 								UserEvent::StateChange => (),
-								UserEvent::PositionUpdate(pos) => self.position_update(user, pos),
+								UserEvent::PositionUpdate(pos) => {
+									self.position_update(user, pos)
+								}
 								UserEvent::TransformUpdate(mat, pos) => {
 									self.transform_update(user, mat, pos)
 								}
@@ -196,7 +218,7 @@ impl Bureau {
 			}
 
 			let mut removed = 0;
-			self.users.retain(|_, user| {
+			self.users.borrow_mut().retain(|_, user| {
 				let connected = user.is_connected();
 
 				if !connected {
@@ -218,7 +240,7 @@ impl Bureau {
 		// Check values between 1 and max_players inclusive and return the first unused id
 		for i in 0..self.options.max_players {
 			let id = self.user_index.overflowing_add(i).0 % self.options.max_players + 1;
-			if !self.users.contains_key(&(id as i32)) {
+			if !self.users.borrow().contains_key(&(id as i32)) {
 				self.user_index = id;
 				return Some(id as i32);
 			}
@@ -230,7 +252,7 @@ impl Bureau {
 	fn update_aura(&self, user: &User) {
 		let user_pos = user.get_pos();
 
-		for (id, other) in &self.users {
+		for (id, other) in self.users.borrow().iter() {
 			if *id == user.id {
 				continue;
 			}
@@ -243,23 +265,19 @@ impl Bureau {
 					other.remove_aura(&user.id);
 
 					// Tell other that user is gone
-					let mut user_left = ByteWriter::new();
-					user_left.write_i32(user.id);
 					other.send(&ByteWriter::general_message(
 						other.id,
 						other.id,
 						Opcode::SMsgUserLeft,
-						&user_left,
+						&ByteWriter::new().write_i32(user.id),
 					));
 
 					// Tell user that other is gone
-					let mut other_left = ByteWriter::new();
-					other_left.write_i32(other.id);
 					user.send(&ByteWriter::general_message(
 						user.id,
 						user.id,
 						Opcode::SMsgUserLeft,
-						&other_left,
+						&ByteWriter::new().write_i32(other.id),
 					));
 				}
 			} else if dist <= self.options.aura_radius.powi(2) {
@@ -267,20 +285,15 @@ impl Bureau {
 				other.add_aura(user.id);
 
 				// Send user to other
-				let mut user_joined = ByteWriter::new();
-				user_joined.write_i32(user.id);
-				user_joined.write_i32(user.id);
-				user_joined.write_string(&user.get_avatar());
-				user_joined.write_string(&user.get_name());
-
-				let mut user_cupdate = ByteWriter::new();
-				user_cupdate.write_string(&user.get_data());
-
 				other.send(&ByteWriter::general_message(
 					other.id,
 					other.id,
 					Opcode::SMsgUserJoined,
-					&user_joined,
+					&ByteWriter::new()
+						.write_i32(user.id)
+						.write_i32(user.id)
+						.write_string(&user.get_avatar())
+						.write_string(&user.get_name()),
 				));
 				other.send(&ByteWriter::message_common(
 					other.id,
@@ -288,24 +301,19 @@ impl Bureau {
 					user.id,
 					MsgCommon::CharacterUpdate,
 					1,
-					&user_cupdate,
+					&ByteWriter::new().write_string(&user.get_data()),
 				));
 
 				// Send other to user
-				let mut other_joined = ByteWriter::new();
-				other_joined.write_i32(other.id);
-				other_joined.write_i32(other.id);
-				other_joined.write_string(&other.get_avatar());
-				other_joined.write_string(&other.get_name());
-
-				let mut other_cupdate = ByteWriter::new();
-				other_cupdate.write_string(&other.get_data());
-
 				user.send(&ByteWriter::general_message(
 					user.id,
 					user.id,
 					Opcode::SMsgUserJoined,
-					&other_joined,
+					&ByteWriter::new()
+						.write_i32(other.id)
+						.write_i32(other.id)
+						.write_string(&other.get_avatar())
+						.write_string(&other.get_name()),
 				));
 				user.send(&ByteWriter::message_common(
 					user.id,
@@ -313,15 +321,16 @@ impl Bureau {
 					other.id,
 					MsgCommon::CharacterUpdate,
 					1,
-					&other_cupdate,
+					&ByteWriter::new().write_string(&other.get_data()),
 				));
 			}
 		}
 	}
 
 	fn send_to_aura(&self, exluded: &User, stream: &ByteWriter) {
+		let users = self.users.borrow();
 		for id in exluded.get_aura() {
-			let user = match self.users.get(&id) {
+			let user = match users.get(&id) {
 				Some(u) => u,
 				None => continue,
 			};
@@ -330,9 +339,10 @@ impl Bureau {
 	}
 
 	fn send_to_aura_inclusive(&self, user: &User, stream: &ByteWriter) {
+		let users = self.users.borrow();
 		user.send(stream);
 		for id in user.get_aura() {
-			let other = match self.users.get(&id) {
+			let other = match users.get(&id) {
 				Some(u) => u,
 				None => continue,
 			};
@@ -341,13 +351,14 @@ impl Bureau {
 	}
 
 	fn send_to_all(&self, stream: &ByteWriter) {
-		for (_id, user) in &self.users {
+		for (_id, user) in self.users.borrow().iter() {
 			user.send(stream);
 		}
 	}
 
 	fn send_to_others(&self, user: &User, stream: &ByteWriter) {
-		for (id, other) in &self.users {
+		let users = self.users.borrow();
+		for (id, other) in users.iter() {
 			if *id == user.id {
 				continue;
 			}
@@ -357,56 +368,52 @@ impl Bureau {
 	}
 
 	fn disconnect_user(&self, user: &User) {
-		for (id, other) in &self.users {
-			if *id == user.id {
-				continue;
-			}
+		let users = self.users.borrow();
+		for id in user.get_aura() {
+			let other = match users.get(&id) {
+				Some(u) => u,
+				None => continue,
+			};
 
-			if !other.remove_aura(&user.id) {
-				continue;
-			}
+			other.remove_aura(&user.id);
 
-			let mut user_left = ByteWriter::new();
-			user_left.write_i32(user.id);
 			other.send(&ByteWriter::general_message(
 				other.id,
 				other.id,
 				Opcode::SMsgUserLeft,
-				&user_left,
+				&ByteWriter::new().write_i32(user.id),
 			));
 		}
 	}
 
 	fn broadcast_user_count(&self) {
-		let mut user_count = ByteWriter::new();
-		user_count.write_u8(1);
-		user_count.write_i32(self.users.len() as i32);
-
 		self.send_to_all(&ByteWriter::general_message(
 			0,
 			0,
 			Opcode::SMsgUserCount,
-			&user_count,
+			&ByteWriter::new()
+				.write_u8(1)
+				.write_i32(self.users.borrow().len() as i32),
 		));
 	}
 
 	fn position_update(&self, user: &User, pos: Vector3) {
-		self.update_aura(user);
+		self.lua_api.pos_update(user, &pos);
 
+		self.update_aura(user);
 		self.send_to_aura(user, &ByteWriter::position_update(user.id, &pos));
 	}
 
 	fn transform_update(&self, user: &User, mat: Mat3, pos: Vector3) {
-		self.update_aura(user);
+		self.lua_api.trans_update(user);
 
 		let mut content = ByteWriter::new();
 		for i in 0..9 {
-			content.write_f32(mat.data[i]);
+			content = content.write_f32(mat.data[i]);
 		}
-		content.write_f32(pos.x);
-		content.write_f32(pos.y);
-		content.write_f32(pos.z);
+		content = content.write_f32(pos.x).write_f32(pos.y).write_f32(pos.z);
 
+		self.update_aura(user);
 		self.send_to_aura(
 			user,
 			&ByteWriter::message_common(
@@ -420,11 +427,18 @@ impl Bureau {
 		);
 	}
 
-	fn chat_send(&self, user: &User, msg: String) {
-		let text = format!("{}: {}", user.get_name(), msg).to_string();
+	fn chat_send(&self, user: &User, mut msg: String) {
+		if let Some(msg_override) = self.lua_api.chat_send(user, &msg) {
+			if msg_override.len() == 0 {
+				user.send_msg("Your message was hidden.");
+				return;
+			}
 
-		let mut chat_send = ByteWriter::new();
-		chat_send.write_string(&text);
+			msg = msg_override;
+			user.send_msg(format!("Your message was replaced with '{}'", msg).as_str())
+		}
+
+		let text = format!("{}: {}", user.get_name(), msg).to_string();
 
 		self.send_to_others(
 			user,
@@ -434,15 +448,12 @@ impl Bureau {
 				user.id,
 				MsgCommon::ChatSend,
 				1,
-				&chat_send,
+				&ByteWriter::new().write_string(&text),
 			),
 		)
 	}
 
 	fn character_update(&self, user: &User, data: String) {
-		let mut character_update = ByteWriter::new();
-		character_update.write_string(&data);
-
 		self.send_to_aura(
 			user,
 			&ByteWriter::message_common(
@@ -451,14 +462,13 @@ impl Bureau {
 				user.id,
 				MsgCommon::CharacterUpdate,
 				1,
-				&character_update,
+				&ByteWriter::new().write_string(&data),
 			),
 		)
 	}
 
 	fn name_change(&self, user: &User, name: String) {
-		let mut name_change = ByteWriter::new();
-		name_change.write_string(&name);
+		self.lua_api.name_change(user, &name);
 
 		self.send_to_others(
 			user,
@@ -468,14 +478,13 @@ impl Bureau {
 				user.id,
 				MsgCommon::NameChange,
 				1,
-				&name_change,
+				&ByteWriter::new().write_string(&name),
 			),
 		)
 	}
 
 	fn avatar_change(&self, user: &User, avatar: String) {
-		let mut avatar_change = ByteWriter::new();
-		avatar_change.write_string(&avatar);
+		self.lua_api.avatar_change(user, &avatar);
 
 		self.send_to_others(
 			user,
@@ -485,20 +494,17 @@ impl Bureau {
 				user.id,
 				MsgCommon::AvatarChange,
 				1,
-				&avatar_change,
+				&ByteWriter::new().write_string(&avatar),
 			),
 		)
 	}
 
 	fn private_chat(&self, user: &User, receiver: i32, text: String) {
-		let other = match self.users.get(&receiver) {
+		let users = self.users.borrow();
+		let other = match users.get(&receiver) {
 			Some(u) => u,
 			None => return,
 		};
-
-		let mut pchat = ByteWriter::new();
-		pchat.write_i32(user.id);
-		pchat.write_string(&text);
 
 		other.send(&ByteWriter::message_common(
 			user.id,
@@ -506,7 +512,7 @@ impl Bureau {
 			user.id,
 			MsgCommon::PrivateChat,
 			2,
-			&pchat,
+			&ByteWriter::new().write_i32(user.id).write_string(&text),
 		))
 	}
 
@@ -519,23 +525,23 @@ impl Bureau {
 		strarg: String,
 		intarg: i32,
 	) {
-		let mut appl = ByteWriter::new();
-		appl.write_u8(2);
-		appl.write_string(&method);
-		appl.write_string(&strarg);
-		appl.write_i32(intarg);
 		let stream = ByteWriter::message_common(
 			user.id,
 			user.id,
 			id,
 			MsgCommon::ApplSpecific,
 			strategy,
-			&appl,
+			&ByteWriter::new()
+				.write_u8(2)
+				.write_string(&method)
+				.write_string(&strarg)
+				.write_i32(intarg),
 		);
 
 		// This could be wrong... :3c
 		if id == -9999 {
-			let master = match self.users.iter().next() {
+			let users = self.users.borrow();
+			let master = match users.iter().next() {
 				Some((_id, user)) => user,
 				None => return,
 			};
@@ -554,7 +560,8 @@ impl Bureau {
 			0 => self.send_to_aura_inclusive(user, &stream),
 			1 => self.send_to_aura(user, &stream),
 			2 => {
-				let target = match self.users.get(&id) {
+				let users = self.users.borrow();
+				let target = match users.get(&id) {
 					Some(u) => u,
 					None => return,
 				};

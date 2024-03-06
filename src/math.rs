@@ -1,4 +1,3 @@
-#[allow(dead_code)]
 use std::ops::{Add, Sub};
 
 #[derive(Clone)]
