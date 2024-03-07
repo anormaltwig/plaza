@@ -1,9 +1,4 @@
-local hooks = {
-	["think"] = {},
-	["positionupdate"] = {},
-	["transformupdate"] = {},
-	["chatsend"] = {},
-}
+local hooks = {}
 
 ---@diagnostic disable-next-line: lowercase-global
 hook = {}
@@ -33,7 +28,7 @@ end
 
 --- Run your own hook. Useful for letting other plugins know when your own systems are ready.
 ---@param name string
----@param ... any
+---@param ...any
 function hook.call(name, ...)
 	name = string.lower(name)
 

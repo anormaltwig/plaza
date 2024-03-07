@@ -1,7 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, fs, path::PathBuf, rc::Rc};
 
-use anyhow::Result;
-use mlua::{ChunkMode, Error, Function, Lua, RegistryKey, Table};
+use mlua::{ChunkMode, Function, Lua, RegistryKey, Table};
 
 use crate::{
 	math::{Mat3, Vector3},
@@ -20,7 +19,7 @@ pub struct LuaApi {
 }
 
 impl LuaApi {
-	pub fn new(users: Rc<RefCell<HashMap<i32, User>>>) -> Result<Self> {
+	pub fn new(users: Rc<RefCell<HashMap<i32, User>>>) -> anyhow::Result<Self> {
 		let lua = Lua::new();
 
 		let data = fs::read("lua/init.lua")?;
@@ -37,7 +36,8 @@ impl LuaApi {
 		let trans_update = lua.create_registry_value(fn_tbl.get::<_, Function>("trans_update")?)?;
 		let chat_send = lua.create_registry_value(fn_tbl.get::<_, Function>("chat_send")?)?;
 		let name_change = lua.create_registry_value(fn_tbl.get::<_, Function>("name_change")?)?;
-		let avatar_change = lua.create_registry_value(fn_tbl.get::<_, Function>("avatar_change")?)?;
+		let avatar_change =
+			lua.create_registry_value(fn_tbl.get::<_, Function>("avatar_change")?)?;
 
 		drop(fn_tbl);
 
@@ -57,88 +57,98 @@ impl LuaApi {
 		Ok(this)
 	}
 
-	fn create_funcs(lua: &Lua, users: Rc<RefCell<HashMap<i32, User>>>) -> Result<Table> {
+	fn create_funcs(lua: &Lua, users: Rc<RefCell<HashMap<i32, User>>>) -> mlua::Result<Table> {
 		let tbl = lua.create_table()?;
 
-		let u = users.clone();
 		tbl.set(
 			"set_pos",
-			lua.create_function(move |_lua: &Lua, (id, x, y, z): (i32, f32, f32, f32)| {
-				let users = u.borrow();
-				let user = users.get(&id).ok_or(Error::RuntimeError(
-					"Tried to use invalid User.".to_string(),
-				))?;
+			lua.create_function({
+				let users = users.clone();
+				move |_lua: &Lua, (id, x, y, z): (i32, f32, f32, f32)| {
+					let users = users.borrow();
+					let user = users
+						.get(&id)
+						.ok_or(mlua::Error::external("Tried to use invalid User."))?;
 
-				user.set_pos(&Vector3::new(x, y, z));
+					user.set_pos(&Vector3::new(x, y, z));
 
-				Ok(())
+					Ok(())
+				}
 			})?,
 		)?;
 
-		let u = users.clone();
 		tbl.set(
 			"get_pos",
-			lua.create_function(move |_lua: &Lua, id: i32| {
-				let users = u.borrow();
-				let user = users.get(&id).ok_or(Error::RuntimeError(
-					"Tried to use invalid User.".to_string(),
-				))?;
+			lua.create_function({
+				let users = users.clone();
+				move |_lua: &Lua, id: i32| {
+					let users = users.borrow();
+					let user = users
+						.get(&id)
+						.ok_or(mlua::Error::external("Tried to use invalid User."))?;
 
-				let pos = user.get_pos();
+					let pos = user.get_pos();
 
-				Ok((pos.x, pos.y, pos.z))
+					Ok((pos.x, pos.y, pos.z))
+				}
 			})?,
 		)?;
 
-		let u = users.clone();
 		tbl.set(
 			"set_rot",
-			lua.create_function(move |_lua: &Lua, (id, arr): (i32, [f32; 9])| {
-				let users = u.borrow();
-				let user = users.get(&id).ok_or(Error::RuntimeError(
-					"Tried to use invalid User.".to_string(),
-				))?;
+			lua.create_function({
+				let users = users.clone();
+				move |_lua: &Lua, (id, arr): (i32, [f32; 9])| {
+					let users = users.borrow();
+					let user = users
+						.get(&id)
+						.ok_or(mlua::Error::external("Tried to use invalid User."))?;
 
-				let mut m = Mat3::new();
-				m.data = arr;
-				user.set_rot(m);
+					let mut m = Mat3::new();
+					m.data = arr;
+					user.set_rot(m);
 
-				Ok(())
+					Ok(())
+				}
 			})?,
 		)?;
 
-		let u = users.clone();
 		tbl.set(
 			"get_rot",
-			lua.create_function(move |_lua: &Lua, id: i32| {
-				let users = u.borrow();
-				let user = users.get(&id).ok_or(Error::RuntimeError(
-					"Tried to use invalid User.".to_string(),
-				))?;
+			lua.create_function({
+				let users = users.clone();
+				move |_lua: &Lua, id: i32| {
+					let users = users.borrow();
+					let user = users
+						.get(&id)
+						.ok_or(mlua::Error::external("Tried to use invalid User."))?;
 
-				Ok(user.get_rot().data)
+					Ok(user.get_rot().data)
+				}
 			})?,
 		)?;
 
-		let u = users.clone();
 		tbl.set(
 			"send_msg",
-			lua.create_function(move |_lua: &Lua, (id, msg): (i32, String)| {
-				let users = u.borrow();
-				let user = users.get(&id).ok_or(Error::RuntimeError(
-					"Tried to use invalid User.".to_string(),
-				))?;
+			lua.create_function({
+				let users = users.clone();
+				move |_lua: &Lua, (id, msg): (i32, String)| {
+					let users = users.borrow();
+					let user = users
+						.get(&id)
+						.ok_or(mlua::Error::external("Tried to use invalid User."))?;
 
-				user.send_msg(&msg);
+					user.send_msg(&msg);
 
-				Ok(())
+					Ok(())
+				}
 			})?,
 		)?;
 
 		Ok(tbl)
 	}
 
-	fn do_file(&self, path: PathBuf) -> Result<()> {
+	fn do_file(&self, path: PathBuf) -> mlua::Result<()> {
 		let chunkname = format!("={:?}", path);
 
 		let data = fs::read(path)?;
@@ -151,9 +161,10 @@ impl LuaApi {
 		Ok(())
 	}
 
-	fn load_plugins(&self) -> Result<()> {
+	fn load_plugins(&self) -> anyhow::Result<()> {
 		for f in fs::read_dir("plugins")? {
 			let file = f?;
+
 			if file.file_type()?.is_dir() {
 				let path = file.path();
 				let initpath = path.join("init.lua");

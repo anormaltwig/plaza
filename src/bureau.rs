@@ -70,9 +70,7 @@ impl Bureau {
 			let users = Rc::new(RefCell::new(HashMap::new()));
 			let lua_api = match LuaApi::new(users.clone()) {
 				Ok(v) => v,
-				Err(e) => {
-					panic!("Failed to create lua api. {}", e);
-				}
+				Err(e) => panic!("Failed to create lua api. {}", e),
 			};
 
 			Bureau {
@@ -186,11 +184,9 @@ impl Bureau {
 								UserEvent::NewUser(name, avatar) => {
 									self.lua_api.new_user(user, &name, &avatar);
 									self.broadcast_user_count()
-								},
-								UserEvent::StateChange => (),
-								UserEvent::PositionUpdate(pos) => {
-									self.position_update(user, pos)
 								}
+								UserEvent::StateChange => (),
+								UserEvent::PositionUpdate(pos) => self.position_update(user, pos),
 								UserEvent::TransformUpdate(mat, pos) => {
 									self.transform_update(user, mat, pos)
 								}
