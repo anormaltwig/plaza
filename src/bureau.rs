@@ -218,6 +218,7 @@ impl Bureau {
 				let connected = user.is_connected();
 
 				if !connected {
+					self.lua_api.user_leave(user);
 					removed += 1;
 				}
 

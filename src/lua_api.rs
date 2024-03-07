@@ -9,6 +9,7 @@ use crate::{
 
 pub struct LuaApi {
 	lua: Lua,
+
 	think: RegistryKey,
 	new_user: RegistryKey,
 	pos_update: RegistryKey,
@@ -16,6 +17,7 @@ pub struct LuaApi {
 	chat_send: RegistryKey,
 	name_change: RegistryKey,
 	avatar_change: RegistryKey,
+	user_leave: RegistryKey,
 }
 
 impl LuaApi {
@@ -38,6 +40,7 @@ impl LuaApi {
 		let name_change = lua.create_registry_value(fn_tbl.get::<_, Function>("name_change")?)?;
 		let avatar_change =
 			lua.create_registry_value(fn_tbl.get::<_, Function>("avatar_change")?)?;
+		let user_leave = lua.create_registry_value(fn_tbl.get::<_, Function>("user_leave")?)?;
 
 		drop(fn_tbl);
 
@@ -50,6 +53,7 @@ impl LuaApi {
 			chat_send,
 			name_change,
 			avatar_change,
+			user_leave,
 		};
 
 		this.load_plugins()?;
@@ -257,6 +261,17 @@ impl LuaApi {
 		};
 
 		if let Err(e) = avatar_change.call::<_, ()>((user.id, avatar)) {
+			eprintln!("Lua Error:\n{}", e);
+		}
+	}
+
+	pub fn user_leave(&self, user: &User) {
+		let user_leave = match self.lua.registry_value::<Function>(&self.user_leave) {
+			Ok(f) => f,
+			Err(_) => return,
+		};
+
+		if let Err(e) = user_leave.call::<_, ()>(user.id) {
 			eprintln!("Lua Error:\n{}", e);
 		}
 	}
