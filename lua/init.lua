@@ -15,6 +15,8 @@ require("vector")
 
 ---@class User
 ---@field id number
+---@field name string
+---@field avatar string
 local user_meta = {}
 user_meta.__index = user_meta
 
@@ -83,13 +85,13 @@ return {
 		return hook.call("NewUser", u, name, avatar)
 	end,
 	pos_update = function(id, x, y, z)
-		return hook.call("PositionUpdate", user_manager.get(id), Vector(x, y, z))
+		return hook.call("PositionUpdate", users[id], Vector(x, y, z))
 	end,
 	trans_update = function(id)
-		return hook.call("TransformUpdate", user_manager.get(id))
+		return hook.call("TransformUpdate", users[id])
 	end,
 	chat_send = function(id, msg)
-		return hook.call("ChatSend", user_manager.get(id), msg)
+		return hook.call("ChatSend", users[id], msg)
 	end,
 	name_change = function(id, name)
 		local u = users[id]

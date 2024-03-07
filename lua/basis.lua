@@ -8,11 +8,11 @@ function basis:set(arr)
 	end
 end
 
---- Sets values based on a given yaw. Only use this function on a new basis.
----@param yaw number yaw in radians
-function basis:fromYaw(yaw)
-	local s = math.sin(yaw)
-	local c = math.cos(yaw)
+--- Sets values based on a given angle. Only use this function on a new basis.
+---@param r number Yaw in radians.
+function basis:fromYaw(r)
+	local s = math.sin(r)
+	local c = math.cos(r)
 
 	self[1] = c
 	self[3] = s
