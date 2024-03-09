@@ -2,6 +2,8 @@
 local basis = {}
 basis.__index = basis
 
+--- Set values of the basis.
+---@param arr number[]
 function basis:set(arr)
 	for i = 1, 9 do
 		self[i] = arr[i] or 0
@@ -38,7 +40,7 @@ function basis:getScale()
 	)
 end
 
---- Sets the scale of the basis
+--- Sets the scale of the basis.
 ---@param v Vector
 function basis:setScale(v)
 	local s = self:getScale()
@@ -56,6 +58,7 @@ function basis:setScale(v)
 	self[9] = self[9] / s[3] * v[3]
 end
 
+--- Create a new basis.
 ---@return Basis
 function Basis()
 	return setmetatable({

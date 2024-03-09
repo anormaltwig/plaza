@@ -5,6 +5,8 @@ local get_pos = ftbl.get_pos
 local set_rot = ftbl.set_rot
 local get_rot = ftbl.get_rot
 local send_msg = ftbl.send_msg
+local disconnect = ftbl.disconnect
+local get_peer_addr = ftbl.get_peer_addr
 
 -- Add lua and plugin directories to loader path.
 package.path = "lua/?.lua;plugins/?.lua;" .. package.path
@@ -19,6 +21,17 @@ require("vector")
 ---@field avatar string
 local user_meta = {}
 user_meta.__index = user_meta
+
+--- Disconnect the user from the bureau.
+function user_meta:disconnect()
+	return disconnect(self.id)
+end
+
+--- Get socket address of the user.
+---@return string
+function user_meta:getPeerAddr()
+	return get_peer_addr(self.id)
+end
 
 --- Set User's position.
 ---@param pos Vector
@@ -74,9 +87,12 @@ function user_manager.get(id)
 	return users[id]
 end
 
-return {
+return {	
 	think = function()
 		return hook.call("Think")
+	end,
+	user_connecting = function(addr)
+		return hook.call("UserConnecting", addr)
 	end,
 	new_user = function(id, name, avatar)
 		local u = setmetatable({id = id, name = name, avatar = avatar}, user_meta)
@@ -110,6 +126,18 @@ return {
 		u.avatar = avatar
 
 		return hook.call("AvatarChange", u, avatar, old)
+	end,
+	aura_enter = function(id1, id2)
+		local u1 = users[id1]
+		local u2 = users[id2]
+
+		return hook.call("AuraEnter", u1, u2)
+	end,
+	aura_leave = function(id1, id2)
+		local u1 = users[id1]
+		local u2 = users[id2]
+
+		return hook.call("AuraLeave", u1, u2)
 	end,
 	user_leave = function(id)
 		local u = users[id]

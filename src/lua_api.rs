@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, fs, path::PathBuf, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, fs, net::SocketAddr, path::PathBuf, rc::Rc};
 
 use mlua::{ChunkMode, Function, Lua, RegistryKey, Table};
 
@@ -11,12 +11,15 @@ pub struct LuaApi {
 	lua: Lua,
 
 	think: RegistryKey,
+	user_connecting: RegistryKey,
 	new_user: RegistryKey,
 	pos_update: RegistryKey,
 	trans_update: RegistryKey,
 	chat_send: RegistryKey,
 	name_change: RegistryKey,
 	avatar_change: RegistryKey,
+	aura_enter: RegistryKey,
+	aura_leave: RegistryKey,
 	user_leave: RegistryKey,
 }
 
@@ -33,6 +36,8 @@ impl LuaApi {
 			.call(Self::create_funcs(&lua, users)?)?;
 
 		let think = lua.create_registry_value(fn_tbl.get::<_, Function>("think")?)?;
+		let user_connecting =
+			lua.create_registry_value(fn_tbl.get::<_, Function>("user_connecting")?)?;
 		let new_user = lua.create_registry_value(fn_tbl.get::<_, Function>("new_user")?)?;
 		let pos_update = lua.create_registry_value(fn_tbl.get::<_, Function>("pos_update")?)?;
 		let trans_update = lua.create_registry_value(fn_tbl.get::<_, Function>("trans_update")?)?;
@@ -40,19 +45,25 @@ impl LuaApi {
 		let name_change = lua.create_registry_value(fn_tbl.get::<_, Function>("name_change")?)?;
 		let avatar_change =
 			lua.create_registry_value(fn_tbl.get::<_, Function>("avatar_change")?)?;
+		let aura_enter = lua.create_registry_value(fn_tbl.get::<_, Function>("aura_enter")?)?;
+		let aura_leave = lua.create_registry_value(fn_tbl.get::<_, Function>("aura_leave")?)?;
 		let user_leave = lua.create_registry_value(fn_tbl.get::<_, Function>("user_leave")?)?;
 
 		drop(fn_tbl);
 
 		let this = Self {
 			lua,
+
 			think,
+			user_connecting,
 			new_user,
 			pos_update,
 			trans_update,
 			chat_send,
 			name_change,
 			avatar_change,
+			aura_enter,
+			aura_leave,
 			user_leave,
 		};
 
@@ -149,6 +160,38 @@ impl LuaApi {
 			})?,
 		)?;
 
+		tbl.set(
+			"disconnect",
+			lua.create_function({
+				let users = users.clone();
+				move |_lua: &Lua, id: i32| {
+					let users = users.borrow();
+					let user = users
+						.get(&id)
+						.ok_or(mlua::Error::external("Tried to use invalid User."))?;
+
+					user.disconnect();
+
+					Ok(())
+				}
+			})?,
+		)?;
+
+		tbl.set(
+			"get_peer_addr",
+			lua.create_function({
+				let users = users.clone();
+				move |_lua: &Lua, id: i32| {
+					let users = users.borrow();
+					let user = users
+						.get(&id)
+						.ok_or(mlua::Error::external("Tried to use invalid User."))?;
+
+					Ok(user.peer_addr()?.to_string())
+				}
+			})?,
+		)?;
+
 		Ok(tbl)
 	}
 
@@ -195,6 +238,24 @@ impl LuaApi {
 
 		if let Err(e) = think.call::<_, ()>(()) {
 			eprintln!("Lua Error:\n{}", e);
+		}
+	}
+
+	pub fn user_connecting(&self, addr: SocketAddr) -> bool {
+		let user_connecting = match self.lua.registry_value::<Function>(&self.user_connecting) {
+			Ok(f) => f,
+			Err(_) => return true,
+		};
+
+		match user_connecting.call::<_, Option<bool>>(addr.to_string()) {
+			Ok(opt) => match opt {
+				Some(b) => b,
+				None => true,
+			},
+			Err(e) => {
+				eprintln!("Lua Error:\n{}", e);
+				true
+			}
 		}
 	}
 
@@ -261,6 +322,28 @@ impl LuaApi {
 		};
 
 		if let Err(e) = avatar_change.call::<_, ()>((user.id, avatar)) {
+			eprintln!("Lua Error:\n{}", e);
+		}
+	}
+
+	pub fn aura_enter(&self, user: &User, other: &User) {
+		let aura_enter = match self.lua.registry_value::<Function>(&self.aura_enter) {
+			Ok(f) => f,
+			Err(_) => return,
+		};
+
+		if let Err(e) = aura_enter.call::<_, ()>((user.id, other.id)) {
+			eprintln!("Lua Error:\n{}", e);
+		}
+	}
+
+	pub fn aura_leave(&self, user: &User, other: &User) {
+		let aura_leave = match self.lua.registry_value::<Function>(&self.aura_leave) {
+			Ok(f) => f,
+			Err(_) => return,
+		};
+
+		if let Err(e) = aura_leave.call::<_, ()>((user.id, other.id)) {
 			eprintln!("Lua Error:\n{}", e);
 		}
 	}

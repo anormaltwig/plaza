@@ -2,7 +2,7 @@ use std::{
 	cell::RefCell,
 	collections::HashSet,
 	io::{self, ErrorKind, Read, Write},
-	net::TcpStream,
+	net::{SocketAddr, TcpStream},
 };
 
 use crate::{
@@ -61,6 +61,14 @@ impl User {
 
 	pub fn is_connected(&self) -> bool {
 		self.internal.borrow().connected
+	}
+
+	pub fn disconnect(&self) {
+		self.internal.borrow_mut().connected = false;
+	}
+
+	pub fn peer_addr(&self) -> io::Result<SocketAddr> {
+		Ok(self.internal.borrow().socket.peer_addr()?)
 	}
 
 	pub fn set_pos(&self, pos: &Vector3) {

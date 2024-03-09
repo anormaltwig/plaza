@@ -106,9 +106,11 @@ impl Bureau {
 
 			self.lua_api.think();
 
-			if let Ok((socket, _addr)) = self.listener.accept() {
-				if let Ok(()) = socket.set_nonblocking(true) {
-					connecting.push((now.clone(), socket));
+			if let Ok((socket, addr)) = self.listener.accept() {
+				if self.lua_api.user_connecting(addr) {
+					if let Ok(()) = socket.set_nonblocking(true) {
+						connecting.push((now.clone(), socket));
+					}
 				}
 			}
 
@@ -276,6 +278,8 @@ impl Bureau {
 						Opcode::SMsgUserLeft,
 						&ByteWriter::new().write_i32(other.id),
 					));
+
+					self.lua_api.aura_leave(user, other);
 				}
 			} else if dist <= self.options.aura_radius.powi(2) {
 				user.add_aura(other.id);
@@ -320,6 +324,8 @@ impl Bureau {
 					1,
 					&ByteWriter::new().write_string(&other.get_data()),
 				));
+
+				self.lua_api.aura_enter(user, other);
 			}
 		}
 	}

@@ -3,7 +3,7 @@ local hooks = {}
 ---@diagnostic disable-next-line: lowercase-global
 hook = {}
 
---- Adds a new callback for the given hook name
+--- Adds a new callback for the given hook name.
 ---@param name string
 ---@param id string
 ---@param func function
@@ -18,7 +18,7 @@ function hook.add(name, id, func)
 	tbl[id] = func
 end
 
---- Adds a new callback for the given hook name and id pair
+--- Remove callback for the given hook name and id pair.
 ---@param name string
 ---@param id string
 function hook.remove(name, id)
@@ -26,7 +26,7 @@ function hook.remove(name, id)
 	hooks[name][id] = nil
 end
 
---- Run your own hook. Useful for letting other plugins know when your own systems are ready.
+--- Run a hook. Useful for letting other plugins know when something happens.
 ---@param name string
 ---@param ...any
 function hook.call(name, ...)
