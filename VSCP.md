@@ -92,7 +92,7 @@ Every packet starts with a uint8 defining what type of packet it is followed imm
 
 - General Message and Position Update are also internally called 'Sys0 Message' and 'Sys2 Message' respectively by the original bureau, but were renamed since they are both nicer names, and because they were named that way before I started looking through decompiled code.
 
-- Unknown purpose, possibly for syncing objects?
+- Unknown purpose, decompiled community place browser code has debug logs referencing "kinemation" bodies and frames. Maybe for syncing animations?
 
 - Byte Size of 14 is a guess based on numbers used in the decompiled code.
 
