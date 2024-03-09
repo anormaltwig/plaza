@@ -16,6 +16,21 @@ Remove callback for the given hook name and id pair.
 
 Run a hook. Useful for letting other plugins know when something happens.
 
+### Hooks
+
+| Name | Args | Desc |
+| --- | --- | --- |
+| Think | | Called every time the bureau polls users. |
+| UserConnecting | addr: string | Called when a client first connects, passes socket address. |
+| NewUser | user: User, name: string, avatar: string | Called when a user fully connects to the bureau. |
+| PositionUpdate | user: User, pos: Vector | Called when a user sends their position |
+| TransformUpdate | user: User | Called when a user sends their transform |
+| NameChange | user: User | Called every time someone changes their name |
+| AvatarChange | user: User | Called every time someone changes their avatar |
+| AuraEnter | a: User, b: User | Called when user a enters user b's aura |
+| AuraLeave | a: User, b: User | Called when user a leaves user b's aura |
+| UserLeave | user: User | Called when a user disconnects |
+
 ## User
 
 `User:disconnect()`
