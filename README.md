@@ -9,6 +9,6 @@ See VSCP.md for more details!
 - [x] Basic bureau implementation.
 - [ ] Fully implement ApplSpecific.
 - [ ] Logging system.
-- [ ] Lua API (likely mlua or custom bindings).
+- [x] Lua API (likely mlua or custom bindings).
 - [ ] WLS Implementation.
 
