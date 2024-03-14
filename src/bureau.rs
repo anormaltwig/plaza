@@ -541,8 +541,6 @@ impl Bureau {
 				.write_i32(intarg),
 		);
 
-		println!("Alright {}(\"{}\", {})", method, strarg, intarg);
-
 		// This could be wrong... :3c
 		if id == -9999 {
 			let users = self.users.borrow();
