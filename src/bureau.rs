@@ -220,7 +220,7 @@ impl Bureau {
 				let connected = user.is_connected();
 
 				if !connected {
-					self.lua_api.user_leave(user);
+					self.lua_api.user_disconnect(user);
 					removed += 1;
 				}
 
@@ -541,6 +541,8 @@ impl Bureau {
 				.write_i32(intarg),
 		);
 
+		println!("Alright {}(\"{}\", {})", method, strarg, intarg);
+
 		// This could be wrong... :3c
 		if id == -9999 {
 			let users = self.users.borrow();
@@ -552,6 +554,8 @@ impl Bureau {
 			match strategy {
 				// Missing two other strategies here, I've yet to figure out what exactly they do.
 				// I'm guessing they have to do with the master client responding to a message.
+				0 | 3 | 5 => self.send_to_all(&stream),
+				1 | 4 | 6 => self.send_to_others(user, &stream),
 				2 => master.send(&stream),
 				_ => (),
 			}

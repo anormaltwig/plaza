@@ -35,7 +35,7 @@ Packets will be displayed in the following format
 
 ## Initial Connection
 
-#### Hello (Initial)
+### Hello (Initial)
 
 The first packet sent by a connected client contains "hello" as well as two `uint8`s, assumed to represent the browser version.
 
@@ -45,7 +45,7 @@ The first packet sent by a connected client contains "hello" as well as two `uin
 | VscpVerMajor | 1 | int8 | |
 | VscpVerMinor | 1 | int8 | |
 
-#### Hello (Server Response)
+### Hello (Server Response)
 
 After the initial hello packet is sent by a client the server will respond with its own hello packet.
 
@@ -126,21 +126,21 @@ Every packet starts with a uint8 defining what type of packet it is followed imm
 | SMsgBroadcastId | 4 |
 | MsgCommon | 6 |
 | CMsgStateChange | 7 |
-| SMsgUnnamed1 | 8 |
+| SMsgSetMaster | 8 |
 | SMsgUserCount | 11 |
 
 ### CMsgNewUser
 
-| Name | Bytes | Type | Description |
-| --- | --- | --- | --- |
-| Username | ~ | string | |
-| Avatar | ~ | string | |
+| Name | Bytes | Type |
+| --- | --- | --- |
+| Username | ~ | string |
+| Avatar | ~ | string |
 
 ### SMsgClientId 
 
-| Name | Bytes | Type | Description |
-| --- | --- | --- | --- |
-| ClientId | 4 | int32 | |
+| Name | Bytes | Type |
+| --- | --- | --- |
+| ClientId | 4 | int32 |
 
 ### SMsgUserJoined
 
@@ -157,9 +157,9 @@ Every packet starts with a uint8 defining what type of packet it is followed imm
 
 ### SMsgUserLeft
 
-| Name | Bytes | Type | Description |
-| --- | --- | --- | --- |
-| BroadcastId | 4 | int32 | |
+| Name | Bytes | Type |
+| --- | --- | --- |
+| BroadcastId | 4 | int32 |
 
 ### SMsgBroadcastId
 
@@ -169,18 +169,18 @@ Every packet starts with a uint8 defining what type of packet it is followed imm
 
 ### MsgCommon
 
-| Name | Bytes | Type | Description |
-| --- | --- | --- | --- |
-| BroadcastId | 4 | int32 | |
-| MsgType | 4 | uint32 | |
-| Strategy | 1 | uint8 | |
-| Content | ~ | data | |
+| Name | Bytes | Type |
+| --- | --- | --- |
+| BroadcastId | 4 | int32 |
+| MsgType | 4 | uint32 |
+| Strategy | 1 | uint8 |
+| Content | ~ | data |
 
 ### CMsgStateChange
 
-| Name | Bytes | Type | Description |
-| --- | --- | --- | --- |
-| State | 1 | u8 | |
+| Name | Bytes | Type |
+| --- | --- | --- |
+| State | 1 | u8 |
 
 | State | Value |
 | --- | --- |
@@ -191,11 +191,15 @@ Every packet starts with a uint8 defining what type of packet it is followed imm
 | Active | 4 |
 | Sleep | 5 |
 
-### SMsgUnamed1
+### SMsgSetMaster
 
 | Name | Bytes | Type | Description |
 | --- | --- | --- | --- |
-| ??? | 1 | uint8 | |
+| IsMaster | 1 | uint8 | Set to 1 when they are the master, 0 when they arn't. |
+
+#### Notes
+
+- Pretty much determintes whether the amIMaster vscp api function returns true or false.
 
 ### SMsgUserCount
 
@@ -294,6 +298,7 @@ Every packet starts with a uint8 defining what type of packet it is followed imm
 ### PrivateChat
 
 | Name | Bytes | Type | Description |
+| --- | --- | --- | --- |
 | BroadcastId | 4 | int32 | The BroadcastId of the user who sent the message. |
 | Message | ~ | string | |
 

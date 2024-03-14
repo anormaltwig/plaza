@@ -20,12 +20,13 @@ pub struct LuaApi {
 	avatar_change: RegistryKey,
 	aura_enter: RegistryKey,
 	aura_leave: RegistryKey,
-	user_leave: RegistryKey,
+	user_disconnect: RegistryKey,
 }
 
 impl LuaApi {
 	pub fn new(users: Rc<RefCell<HashMap<i32, User>>>) -> anyhow::Result<Self> {
-		let lua = Lua::new();
+		// I want to enable C modules. :3c
+		let lua = unsafe { Lua::unsafe_new() };
 
 		let data = fs::read("lua/init.lua")?;
 
@@ -47,7 +48,8 @@ impl LuaApi {
 			lua.create_registry_value(fn_tbl.get::<_, Function>("avatar_change")?)?;
 		let aura_enter = lua.create_registry_value(fn_tbl.get::<_, Function>("aura_enter")?)?;
 		let aura_leave = lua.create_registry_value(fn_tbl.get::<_, Function>("aura_leave")?)?;
-		let user_leave = lua.create_registry_value(fn_tbl.get::<_, Function>("user_leave")?)?;
+		let user_disconnect =
+			lua.create_registry_value(fn_tbl.get::<_, Function>("user_disconnect")?)?;
 
 		drop(fn_tbl);
 
@@ -64,7 +66,7 @@ impl LuaApi {
 			avatar_change,
 			aura_enter,
 			aura_leave,
-			user_leave,
+			user_disconnect,
 		};
 
 		this.load_plugins()?;
@@ -348,13 +350,13 @@ impl LuaApi {
 		}
 	}
 
-	pub fn user_leave(&self, user: &User) {
-		let user_leave = match self.lua.registry_value::<Function>(&self.user_leave) {
+	pub fn user_disconnect(&self, user: &User) {
+		let user_disconnect = match self.lua.registry_value::<Function>(&self.user_disconnect) {
 			Ok(f) => f,
 			Err(_) => return,
 		};
 
-		if let Err(e) = user_leave.call::<_, ()>(user.id) {
+		if let Err(e) = user_disconnect.call::<_, ()>(user.id) {
 			eprintln!("Lua Error:\n{}", e);
 		}
 	}

@@ -259,40 +259,36 @@ impl User {
 		self.set_name(username.clone());
 		self.set_avatar(avatar.clone());
 
-		let client_id = ByteWriter::new().write_i32(self.id);
 		self.send(&ByteWriter::general_message(
 			0,
 			self.id,
 			Opcode::SMsgClientId,
-			&client_id,
+			&ByteWriter::new().write_i32(self.id),
 		));
 
-		let unnamed1 = ByteWriter::new().write_u8(1);
 		self.send(&ByteWriter::general_message(
 			self.id,
 			self.id,
-			Opcode::SMsgUnnamed1,
-			&unnamed1,
+			Opcode::SMsgSetMaster,
+			&ByteWriter::new().write_u8(0),
 		));
 
-		let user_joined = ByteWriter::new()
-			.write_i32(self.id)
-			.write_i32(self.id)
-			.write_string(&self.get_avatar())
-			.write_string(&self.get_name());
 		self.send(&ByteWriter::general_message(
 			self.id,
 			self.id,
 			Opcode::SMsgUserJoined,
-			&user_joined,
+			&ByteWriter::new()
+				.write_i32(self.id)
+				.write_i32(self.id)
+				.write_string(&self.get_avatar())
+				.write_string(&self.get_name()),
 		));
 
-		let broadcast_id = ByteWriter::new().write_i32(self.id);
 		self.send(&ByteWriter::general_message(
 			self.id,
 			self.id,
 			Opcode::SMsgBroadcastId,
-			&broadcast_id,
+			&ByteWriter::new().write_i32(self.id),
 		));
 
 		Some(UserEvent::NewUser(username, avatar))

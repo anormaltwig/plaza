@@ -5,7 +5,7 @@ hook = {}
 
 --- Adds a new callback for the given hook name.
 ---@param name string
----@param id string
+---@param id any
 ---@param func function
 function hook.add(name, id, func)
 	name = string.lower(name)
@@ -20,7 +20,7 @@ end
 
 --- Remove callback for the given hook name and id pair.
 ---@param name string
----@param id string
+---@param id any 
 function hook.remove(name, id)
 	name = string.lower(name)
 	hooks[name][id] = nil

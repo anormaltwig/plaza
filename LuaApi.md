@@ -29,7 +29,7 @@ Run a hook. Useful for letting other plugins know when something happens.
 | AvatarChange | user: User | Called every time someone changes their avatar |
 | AuraEnter | a: User, b: User | Called when user a enters user b's aura |
 | AuraLeave | a: User, b: User | Called when user a leaves user b's aura |
-| UserLeave | user: User | Called when a user disconnects |
+| UserDisconnect | user: User | Called when a user disconnects |
 
 ## User
 

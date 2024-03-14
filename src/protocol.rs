@@ -11,7 +11,7 @@ pub enum Opcode {
 
 	MsgCommon = 6,
 	CMsgStateChange = 7,
-	SMsgUnnamed1 = 8,
+	SMsgSetMaster = 8,
 
 	SMsgUserCount = 11,
 }

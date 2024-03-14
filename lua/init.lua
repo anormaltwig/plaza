@@ -87,7 +87,7 @@ function user_manager.get(id)
 	return users[id]
 end
 
-return {	
+return {
 	think = function()
 		return hook.call("Think")
 	end,
@@ -139,11 +139,11 @@ return {
 
 		return hook.call("AuraLeave", u1, u2)
 	end,
-	user_leave = function(id)
+	user_disconnect = function(id)
 		local u = users[id]
 		users[id] = nil
 
-		return hook.call("UserLeave", u)
+		return hook.call("UserDisconnect", u)
 	end
 }
 
