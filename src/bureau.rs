@@ -1,7 +1,6 @@
 use std::{
 	cell::RefCell,
-	collections::HashMap,
-	io::{self, Read, Write},
+	io::{self, Read},
 	net::{TcpListener, ToSocketAddrs},
 	rc::Rc,
 	sync::mpsc::{self, Receiver, Sender},
@@ -14,6 +13,7 @@ use crate::{
 	math::{Mat3, Vector3},
 	protocol::{ByteWriter, MsgCommon, Opcode},
 	user::{User, UserEvent},
+	user_list::UserList,
 };
 
 enum BureauSignal {
@@ -21,7 +21,7 @@ enum BureauSignal {
 }
 
 pub struct BureauOptions {
-	pub max_players: u16,
+	pub max_players: i32,
 	pub aura_radius: f32,
 }
 
@@ -45,18 +45,15 @@ impl BureauHandle {
 }
 
 pub struct Bureau {
-	users: Rc<RefCell<HashMap<i32, User>>>,
-	user_index: u16,
-
+	user_list: Rc<RefCell<UserList>>,
 	listener: TcpListener,
 	receiver: Receiver<BureauSignal>,
 	options: BureauOptions,
-
 	lua_api: LuaApi,
 }
 
 impl Bureau {
-	/// Starts a new bureau and returns a speacial handle for its thread.
+	/// Starts a new bureau and returns a special handle for its thread.
 	pub fn new<A>(addr: A, options: BureauOptions) -> io::Result<BureauHandle>
 	where
 		A: ToSocketAddrs,
@@ -67,20 +64,17 @@ impl Bureau {
 		let (signaller, receiver) = mpsc::channel::<BureauSignal>();
 
 		let handle = thread::spawn(|| {
-			let users = Rc::new(RefCell::new(HashMap::new()));
-			let lua_api = match LuaApi::new(users.clone()) {
+			let user_list = Rc::new(RefCell::new(UserList::new(options.max_players)));
+			let lua_api = match LuaApi::new(user_list.clone()) {
 				Ok(v) => v,
 				Err(e) => panic!("Failed to create lua api. {}", e),
 			};
 
 			Bureau {
-				users,
-				user_index: 0,
-
+				user_list,
 				listener,
 				receiver,
 				options,
-
 				lua_api,
 			}
 			.run()
@@ -92,7 +86,7 @@ impl Bureau {
 		})
 	}
 
-	fn run(mut self) {
+	fn run(self) {
 		let mut connecting = Vec::new();
 
 		loop {
@@ -141,51 +135,30 @@ impl Bureau {
 					}
 				};
 
-				let mut socket = connecting.swap_remove(i).1;
+				let socket = connecting.swap_remove(i).1;
 
 				if n < 7 {
 					continue;
 				}
 
-				for j in 0..5 {
-					if hello_buf[j] != b"hello"[j] {
-						continue;
-					}
-				}
-				// Last two bytes are likely browser version, doesn't seem important to check.
-
-				let id = match self.get_available_id() {
-					Some(id) => id,
-					None => continue,
-				};
-
-				let buf = [
-					&b"hello\0"[..],
-					&id.to_be_bytes()[..],
-					&id.to_be_bytes()[..],
-				]
-				.concat();
-
-				if let Ok(n) = socket.write(&buf) {
-					if n != buf.len() {
+				for j in 0..7 {
+					// Last two bytes are vscp version.
+					if hello_buf[j] != b"hello\x01\x01"[j] {
 						continue;
 					}
 				}
 
-				if let Ok(user) = User::new(socket, id) {
-					self.users.borrow_mut().insert(id, user);
-				}
+				self.user_list.borrow_mut().new_user(socket);
 			}
 
 			// Handle connected users.
-			for (_id, user) in self.users.borrow().iter() {
+			for (_id, user) in self.user_list.borrow().users.iter() {
 				match user.poll() {
 					Some(events) => {
 						for event in events {
 							match event {
 								UserEvent::NewUser(name, avatar) => {
-									self.lua_api.new_user(user, &name, &avatar);
-									self.broadcast_user_count()
+									self.new_user(user, name, avatar)
 								}
 								UserEvent::StateChange => (),
 								UserEvent::PositionUpdate(pos) => self.position_update(user, pos),
@@ -215,19 +188,19 @@ impl Bureau {
 				}
 			}
 
-			let mut removed = 0;
-			self.users.borrow_mut().retain(|_, user| {
+			let mut removed = false;
+			self.user_list.borrow_mut().users.retain(|_, user| {
 				let connected = user.is_connected();
 
 				if !connected {
 					self.lua_api.user_disconnect(user);
-					removed += 1;
+					removed = true;
 				}
 
 				connected
 			});
 
-			if removed > 0 {
+			if removed {
 				self.broadcast_user_count();
 			}
 
@@ -235,23 +208,10 @@ impl Bureau {
 		}
 	}
 
-	fn get_available_id(&mut self) -> Option<i32> {
-		// Check values between 1 and max_players inclusive and return the first unused id
-		for i in 0..self.options.max_players {
-			let id = self.user_index.overflowing_add(i).0 % self.options.max_players + 1;
-			if !self.users.borrow().contains_key(&(id as i32)) {
-				self.user_index = id;
-				return Some(id as i32);
-			}
-		}
-
-		None
-	}
-
 	fn update_aura(&self, user: &User) {
 		let user_pos = user.get_pos();
 
-		for (id, other) in self.users.borrow().iter() {
+		for (id, other) in self.user_list.borrow().users.iter() {
 			if *id == user.id {
 				continue;
 			}
@@ -331,7 +291,7 @@ impl Bureau {
 	}
 
 	fn send_to_aura(&self, exluded: &User, stream: &ByteWriter) {
-		let users = self.users.borrow();
+		let users = &self.user_list.borrow().users;
 		for id in exluded.get_aura() {
 			let user = match users.get(&id) {
 				Some(u) => u,
@@ -342,7 +302,7 @@ impl Bureau {
 	}
 
 	fn send_to_aura_inclusive(&self, user: &User, stream: &ByteWriter) {
-		let users = self.users.borrow();
+		let users = &self.user_list.borrow().users;
 		user.send(stream);
 		for id in user.get_aura() {
 			let other = match users.get(&id) {
@@ -354,13 +314,13 @@ impl Bureau {
 	}
 
 	fn send_to_all(&self, stream: &ByteWriter) {
-		for (_id, user) in self.users.borrow().iter() {
+		for (_id, user) in self.user_list.borrow().users.iter() {
 			user.send(stream);
 		}
 	}
 
 	fn send_to_others(&self, user: &User, stream: &ByteWriter) {
-		let users = self.users.borrow();
+		let users = &self.user_list.borrow().users;
 		for (id, other) in users.iter() {
 			if *id == user.id {
 				continue;
@@ -371,7 +331,7 @@ impl Bureau {
 	}
 
 	fn disconnect_user(&self, user: &User) {
-		let users = self.users.borrow();
+		let users = &self.user_list.borrow().users;
 		for id in user.get_aura() {
 			let other = match users.get(&id) {
 				Some(u) => u,
@@ -396,8 +356,28 @@ impl Bureau {
 			Opcode::SMsgUserCount,
 			&ByteWriter::new()
 				.write_u8(1)
-				.write_i32(self.users.borrow().len() as i32),
+				.write_i32(self.user_list.borrow().users.len() as i32),
 		));
+	}
+
+	fn new_user(&self, user: &User, name: String, avatar: String) {
+		self.lua_api.new_user(user, &name, &avatar);
+
+		match self.user_list.borrow().get_master() {
+			Some(master) => {
+				if user.id != master.id {
+					user.send(&ByteWriter::general_message(
+						user.id,
+						user.id,
+						Opcode::SMsgSetMaster,
+						&ByteWriter::new().write_u8(0),
+					));
+				}
+			}
+			None => (), // Unreachable?
+		};
+
+		self.broadcast_user_count();
 	}
 
 	fn position_update(&self, user: &User, pos: Vector3) {
@@ -503,7 +483,7 @@ impl Bureau {
 	}
 
 	fn private_chat(&self, user: &User, receiver: i32, text: String) {
-		let users = self.users.borrow();
+		let users = &self.user_list.borrow().users;
 		let other = match users.get(&receiver) {
 			Some(u) => u,
 			None => return,
@@ -541,20 +521,15 @@ impl Bureau {
 				.write_i32(intarg),
 		);
 
-		// This could be wrong... :3c
 		if id == -9999 {
-			let users = self.users.borrow();
-			let master = match users.iter().next() {
-				Some((_id, user)) => user,
-				None => return,
-			};
-
 			match strategy {
-				// Missing two other strategies here, I've yet to figure out what exactly they do.
-				// I'm guessing they have to do with the master client responding to a message.
+				// This could be wrong... :3c
 				0 | 3 | 5 => self.send_to_all(&stream),
 				1 | 4 | 6 => self.send_to_others(user, &stream),
-				2 => master.send(&stream),
+				2 => match self.user_list.borrow().get_master() {
+					Some(master) => master.send(&stream),
+					None => return,
+				},
 				_ => (),
 			}
 
@@ -565,7 +540,7 @@ impl Bureau {
 			0 => self.send_to_aura_inclusive(user, &stream),
 			1 => self.send_to_aura(user, &stream),
 			2 => {
-				let users = self.users.borrow();
+				let users = &self.user_list.borrow().users;
 				let target = match users.get(&id) {
 					Some(u) => u,
 					None => return,

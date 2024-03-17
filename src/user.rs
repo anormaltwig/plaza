@@ -269,13 +269,6 @@ impl User {
 		self.send(&ByteWriter::general_message(
 			self.id,
 			self.id,
-			Opcode::SMsgSetMaster,
-			&ByteWriter::new().write_u8(0),
-		));
-
-		self.send(&ByteWriter::general_message(
-			self.id,
-			self.id,
 			Opcode::SMsgUserJoined,
 			&ByteWriter::new()
 				.write_i32(self.id)

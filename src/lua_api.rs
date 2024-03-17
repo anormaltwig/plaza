@@ -1,10 +1,11 @@
-use std::{cell::RefCell, collections::HashMap, fs, net::SocketAddr, path::PathBuf, rc::Rc};
+use std::{cell::RefCell, fs, net::SocketAddr, path::PathBuf, rc::Rc};
 
 use mlua::{ChunkMode, Function, Lua, RegistryKey, Table};
 
 use crate::{
 	math::{Mat3, Vector3},
 	user::User,
+	user_list::UserList,
 };
 
 pub struct LuaApi {
@@ -24,7 +25,7 @@ pub struct LuaApi {
 }
 
 impl LuaApi {
-	pub fn new(users: Rc<RefCell<HashMap<i32, User>>>) -> anyhow::Result<Self> {
+	pub fn new(users: Rc<RefCell<UserList>>) -> anyhow::Result<Self> {
 		// I want to enable C modules. :3c
 		let lua = unsafe { Lua::unsafe_new() };
 
@@ -74,15 +75,15 @@ impl LuaApi {
 		Ok(this)
 	}
 
-	fn create_funcs(lua: &Lua, users: Rc<RefCell<HashMap<i32, User>>>) -> mlua::Result<Table> {
+	fn create_funcs(lua: &Lua, user_list: Rc<RefCell<UserList>>) -> mlua::Result<Table> {
 		let tbl = lua.create_table()?;
 
 		tbl.set(
 			"set_pos",
 			lua.create_function({
-				let users = users.clone();
+				let user_list = user_list.clone();
 				move |_lua: &Lua, (id, x, y, z): (i32, f32, f32, f32)| {
-					let users = users.borrow();
+					let users = &user_list.borrow().users;
 					let user = users
 						.get(&id)
 						.ok_or(mlua::Error::external("Tried to use invalid User."))?;
@@ -97,9 +98,9 @@ impl LuaApi {
 		tbl.set(
 			"get_pos",
 			lua.create_function({
-				let users = users.clone();
+				let user_list = user_list.clone();
 				move |_lua: &Lua, id: i32| {
-					let users = users.borrow();
+					let users = &user_list.borrow().users;
 					let user = users
 						.get(&id)
 						.ok_or(mlua::Error::external("Tried to use invalid User."))?;
@@ -114,9 +115,9 @@ impl LuaApi {
 		tbl.set(
 			"set_rot",
 			lua.create_function({
-				let users = users.clone();
+				let user_list = user_list.clone();
 				move |_lua: &Lua, (id, arr): (i32, [f32; 9])| {
-					let users = users.borrow();
+					let users = &user_list.borrow().users;
 					let user = users
 						.get(&id)
 						.ok_or(mlua::Error::external("Tried to use invalid User."))?;
@@ -133,9 +134,9 @@ impl LuaApi {
 		tbl.set(
 			"get_rot",
 			lua.create_function({
-				let users = users.clone();
+				let user_list = user_list.clone();
 				move |_lua: &Lua, id: i32| {
-					let users = users.borrow();
+					let users = &user_list.borrow().users;
 					let user = users
 						.get(&id)
 						.ok_or(mlua::Error::external("Tried to use invalid User."))?;
@@ -148,9 +149,9 @@ impl LuaApi {
 		tbl.set(
 			"send_msg",
 			lua.create_function({
-				let users = users.clone();
+				let user_list = user_list.clone();
 				move |_lua: &Lua, (id, msg): (i32, String)| {
-					let users = users.borrow();
+					let users = &user_list.borrow().users;
 					let user = users
 						.get(&id)
 						.ok_or(mlua::Error::external("Tried to use invalid User."))?;
@@ -165,9 +166,9 @@ impl LuaApi {
 		tbl.set(
 			"disconnect",
 			lua.create_function({
-				let users = users.clone();
+				let user_list = user_list.clone();
 				move |_lua: &Lua, id: i32| {
-					let users = users.borrow();
+					let users = &user_list.borrow().users;
 					let user = users
 						.get(&id)
 						.ok_or(mlua::Error::external("Tried to use invalid User."))?;
@@ -182,9 +183,9 @@ impl LuaApi {
 		tbl.set(
 			"get_peer_addr",
 			lua.create_function({
-				let users = users.clone();
+				let user_list = user_list.clone();
 				move |_lua: &Lua, id: i32| {
-					let users = users.borrow();
+					let users = &user_list.borrow().users;
 					let user = users
 						.get(&id)
 						.ok_or(mlua::Error::external("Tried to use invalid User."))?;

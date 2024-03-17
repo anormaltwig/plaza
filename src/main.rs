@@ -3,6 +3,7 @@ mod lua_api;
 mod math;
 mod protocol;
 mod user;
+mod user_list;
 mod wls;
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -19,7 +20,7 @@ struct Args {
 	port: u16,
 
 	#[arg(short, long, default_value_t = 256)]
-	maxplayers: u16,
+	maxplayers: i32,
 
 	#[arg(short, long, default_value_t = 300.0)]
 	auraradius: f32,
