@@ -413,12 +413,10 @@ impl Bureau {
 	fn chat_send(&self, user: &User, mut msg: String) {
 		if let Some(msg_override) = self.lua_api.chat_send(user, &msg) {
 			if msg_override.len() == 0 {
-				user.send_msg("Your message was hidden.");
 				return;
 			}
 
 			msg = msg_override;
-			user.send_msg(format!("Your message was replaced with '{}'", msg).as_str())
 		}
 
 		let text = format!("{}: {}", user.get_name(), msg).to_string();

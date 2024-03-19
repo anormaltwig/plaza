@@ -167,12 +167,10 @@ impl User {
 		let mut buf: [u8; 512] = [0; 512];
 		let n = match internal.socket.read(&mut buf) {
 			Ok(n) => {
-				if n == 0 {
-					internal.connected = false;
-					return None;
-				}
-
 				if n < 17 {
+					if n == 0 {
+						internal.connected = false;
+					}
 					return None;
 				}
 
