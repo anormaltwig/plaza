@@ -110,7 +110,7 @@ impl Bureau {
 
 			// Handling pending users.
 			let mut i = 0;
-			while i < connecting.len() {
+			'outer: while i < connecting.len() {
 				let (connect_time, socket) = &mut connecting[i];
 
 				let mut hello_buf = [0; 7];
@@ -144,7 +144,7 @@ impl Bureau {
 				for j in 0..7 {
 					// Last two bytes are vscp version.
 					if hello_buf[j] != b"hello\x01\x01"[j] {
-						continue;
+						continue 'outer;
 					}
 				}
 

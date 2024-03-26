@@ -9,4 +9,4 @@ strip = true
 [dependencies]
 anyhow = "1.0.80"
 clap = { version = "4.5.1", features = ["derive"] }
-mlua = { version = "0.9.6", features = ["luajit"] }
+mlua = { version = "0.9.6", features = ["luajit", "vendored"] }

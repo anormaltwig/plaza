@@ -8,25 +8,43 @@ use std::{
 
 use crate::bureau::{Bureau, BureauOptions};
 
-#[allow(dead_code)]
-pub struct WLS {
-	bureaus: HashMap<String, Bureau>,
+pub struct WlsOptions {
+	pub max_bureaus: u32,
+	pub host_name: String,
+	pub port: u16,
+	pub bureau_options: BureauOptions,
 }
 
-// !!!Not Finished!!!
+pub struct Wls {
+	options: WlsOptions,
+	listener: TcpListener,
+	bureaus: HashMap<String, Vec<Bureau>>,
+}
 
-#[allow(dead_code)]
-impl WLS {
-	pub fn start(port: u16) -> io::Result<()> {
-		let listener =
-			TcpListener::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), port))?;
+impl Wls {
+	pub fn start(options: WlsOptions) -> io::Result<()> {
+		let listener = TcpListener::bind(SocketAddr::new(
+			IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
+			options.port,
+		))?;
 		listener.set_nonblocking(true)?;
 
+		Self {
+			options,
+			listener,
+			bureaus: HashMap::new(),
+		}
+		.run();
+
+		Ok(())
+	}
+
+	fn run(&mut self) {
 		let mut connecting = Vec::new();
 		loop {
 			let now = SystemTime::now();
 
-			if let Ok((socket, _addr)) = listener.accept() {
+			if let Ok((socket, _addr)) = self.listener.accept() {
 				if let Ok(()) = socket.set_nonblocking(true) {
 					connecting.push((now.clone(), socket));
 				}
@@ -81,20 +99,15 @@ impl WLS {
 				}
 
 				// World Name
-				let _wrl = match split.next() {
+				let wrl = match split.next() {
 					Some(wrl) => wrl,
 					None => continue,
 				};
 
-				let _bureau = Bureau::new(
-					"0.0.0.0:5126",
-					BureauOptions {
-						max_players: 1,
-						aura_radius: 100.0,
-					},
-				);
-
-				socket.write_all(b"f,0,127.0.0.1,5126\0").unwrap();
+				let _ = match self.bureaus.get(wrl) {
+					Some(_b) => socket.write_all(format!("f,0,{},5126\0", self.options.host_name).as_bytes()),
+					_ => socket.write_all(b"f,9"),
+				};
 			}
 
 			thread::sleep(Duration::from_millis(100))
