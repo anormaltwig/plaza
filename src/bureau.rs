@@ -3,7 +3,7 @@ use std::{
 	io::{self, Read},
 	net::{TcpListener, ToSocketAddrs},
 	rc::Rc,
-	sync::mpsc::{self, Receiver, Sender},
+	sync::mpsc::{self, Receiver, Sender, TryRecvError},
 	thread::{self, JoinHandle},
 	time::{Duration, SystemTime},
 };
@@ -20,6 +20,7 @@ enum BureauSignal {
 	Close,
 }
 
+#[derive(Clone)]
 pub struct BureauOptions {
 	pub max_players: i32,
 	pub aura_radius: f32,
@@ -31,7 +32,6 @@ pub struct BureauHandle {
 }
 
 impl BureauHandle {
-	#[allow(dead_code)] // Remove when done implementing WLS.
 	pub fn close(&mut self) {
 		let _ = self.signaller.send(BureauSignal::Close);
 	}
@@ -61,7 +61,7 @@ impl Bureau {
 		let listener = TcpListener::bind(addr)?;
 		listener.set_nonblocking(true)?;
 
-		let (signaller, receiver) = mpsc::channel::<BureauSignal>();
+		let (signaller, receiver) = mpsc::channel();
 
 		let handle = thread::spawn(|| {
 			let user_list = Rc::new(RefCell::new(UserList::new(options.max_players)));
@@ -90,10 +90,13 @@ impl Bureau {
 		let mut connecting = Vec::new();
 
 		loop {
-			if let Ok(signal) = self.receiver.try_recv() {
-				match signal {
+			match self.receiver.try_recv() {
+				Ok(signal) => match signal {
 					BureauSignal::Close => break,
-				}
+					_ => (),
+				},
+				Err(TryRecvError::Disconnected) => break,
+				_ => (),
 			}
 
 			let now = SystemTime::now();

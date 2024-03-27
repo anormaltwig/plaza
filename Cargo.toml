@@ -3,8 +3,12 @@ name = "branch"
 version = "0.1.0"
 edition = "2021"
 
+[profile.dev.package."*"]
+opt-level = 2
+
 [profile.release]
 strip = true
+lto = true
 
 [dependencies]
 anyhow = "1.0.80"

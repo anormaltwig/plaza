@@ -16,7 +16,6 @@ pub enum Opcode {
 	SMsgUserCount = 11,
 }
 
-#[allow(dead_code)]
 #[repr(u32)]
 pub enum MsgCommon {
 	TransformUpdate = 2,
@@ -28,7 +27,6 @@ pub enum MsgCommon {
 	ApplSpecific = 10000,
 }
 
-#[allow(dead_code)]
 /// Easily read values from an incoming packet.
 pub trait ByteReader {
 	fn read_string(&self, start: usize) -> String;

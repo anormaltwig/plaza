@@ -6,7 +6,7 @@ use std::{
 	time::{Duration, SystemTime},
 };
 
-use crate::bureau::{Bureau, BureauOptions};
+use crate::bureau::{BureauHandle, BureauOptions};
 
 pub struct WlsOptions {
 	pub max_bureaus: u32,
@@ -18,7 +18,7 @@ pub struct WlsOptions {
 pub struct Wls {
 	options: WlsOptions,
 	listener: TcpListener,
-	bureaus: HashMap<String, Vec<Bureau>>,
+	bureaus: HashMap<String, Vec<BureauHandle>>,
 }
 
 impl Wls {
@@ -87,10 +87,9 @@ impl Wls {
 
 				let mut split = request.split(',');
 
-				if let Some(f) = split.next() {
-					if f != "f" {
-						continue;
-					}
+				match split.next() {
+					Some(f) if f == "f" => (),
+					_ => continue,
 				}
 
 				// Local IP
@@ -104,10 +103,19 @@ impl Wls {
 					None => continue,
 				};
 
-				let _ = match self.bureaus.get(wrl) {
-					Some(_b) => socket.write_all(format!("f,0,{},5126\0", self.options.host_name).as_bytes()),
-					_ => socket.write_all(b"f,9"),
-				};
+				if let Some(bureaus) = self.bureaus.get(wrl) {
+					if let Some(_bureau) = bureaus.iter().next() {
+						let _ = socket
+							.write_all(format!("f,0,{},5126\0", self.options.host_name).as_bytes());
+						continue;
+					}
+				}
+			}
+
+			for (_, bureaus) in &mut self.bureaus {
+				for bureau in bureaus {
+					bureau.close()
+				}
 			}
 
 			thread::sleep(Duration::from_millis(100))

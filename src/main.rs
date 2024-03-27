@@ -6,8 +6,8 @@ mod user;
 mod user_list;
 mod wls;
 
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use clap::Parser;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use bureau::{Bureau, BureauOptions};
 use wls::{Wls, WlsOptions};
@@ -48,24 +48,28 @@ fn main() {
 	};
 
 	if args.wls {
-		Wls::start(WlsOptions {
+		println!("Starting WLS on port {}", args.port);
+		if let Err(io_err) = Wls::start(WlsOptions {
 			max_bureaus: args.max_bureaus,
 			host_name: args.host_name,
 			port: args.port,
 			bureau_options,
-		})
-		.expect("Failed to start WLS");
-	} else {
-		println!("Starting Bureau on port {}", args.port);
-
-		match Bureau::new(
-			SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), args.port),
-			bureau_options,
-		) {
-			Ok(v) => v,
-			Err(_) => panic!("Failed to start Bureau."),
+		}) {
+			eprintln!("WLS failed to start. {}", io_err);
 		}
-		.join()
-		.expect("Error while joining Bureau thread");
+
+		return;
+	}
+
+	println!("Starting Bureau on port {}", args.port);
+	match Bureau::new(
+		SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), args.port),
+		bureau_options,
+	) {
+		Ok(handle) => match handle.join() {
+			Ok(()) => (),
+			Err(thread_err) => eprintln!("Bureau panicked! ({:?})", thread_err),
+		},
+		Err(io_err) => eprintln!("Bureau failed to start. {}", io_err),
 	}
 }
