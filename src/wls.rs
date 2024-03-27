@@ -1,16 +1,18 @@
 use std::{
-	collections::{HashMap, HashSet},
-	io::{self, Read, Write},
+	collections::HashMap,
+	fs::File,
+	io::{self, BufRead, BufReader, Read, Write},
 	net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener},
 	thread,
-	time::{Duration, SystemTime},
+	time::{Duration, Instant},
 };
 
 use crate::bureau::{Bureau, BureauHandle, BureauOptions};
 
 pub struct WlsOptions {
-	pub max_bureaus: u32,
 	pub host_name: String,
+	pub max_bureaus: u32,
+	pub wrl_list: Option<String>,
 	pub port: u16,
 	pub bureau_options: BureauOptions,
 }
@@ -30,7 +32,16 @@ impl Wls {
 		listener.set_nonblocking(true)?;
 
 		let mut bureaus = HashMap::new();
-		for wrl in Self::default_wrls() {
+
+		let wrls = match &options.wrl_list {
+			Some(path) => {
+				let reader = BufReader::new(File::open(path)?);
+				reader.lines().filter_map(|line| Some(line.ok()?)).collect()
+			}
+			None => Self::default_wrls(),
+		};
+
+		for wrl in wrls {
 			bureaus.insert(wrl, HashMap::new());
 		}
 
@@ -44,98 +55,85 @@ impl Wls {
 		Ok(())
 	}
 
-	fn default_wrls() -> HashSet<String> {
-		let mut list = HashSet::new();
-
-		list.insert("SAPARi COAST MIL.".to_string());
-		list.insert("SAPARi DOWNTOWN MIL.".to_string());
-		list.insert("HONJO JIDAIMURA MIL.".to_string());
-		list.insert("SAPARi PARK MIL.".to_string());
-		list.insert("SAPARi SPA".to_string());
-
-		list
+	fn default_wrls() -> Vec<String> {
+		vec![
+			"SAPARi COAST MIL.".to_string(),
+			"SAPARi DOWNTOWN MIL.".to_string(),
+			"HONJO JIDAIMURA MIL.".to_string(),
+			"SAPARi PARK MIL.".to_string(),
+			"SAPARi SPA".to_string(),
+		]
 	}
 
 	fn run(&mut self) {
 		let mut connecting = Vec::new();
 		loop {
-			let now = SystemTime::now();
-
 			if let Ok((socket, _addr)) = self.listener.accept() {
 				if let Ok(()) = socket.set_nonblocking(true) {
-					connecting.push((now.clone(), socket));
+					connecting.push((Instant::now(), Some(socket)));
 				}
 			}
 
-			let mut i = 0;
-			while i < connecting.len() {
-				let (connect_time, socket) = &mut connecting[i];
-
+			connecting.retain_mut(|(connect_time, socket)| {
 				let mut buf = [0; 128];
-				let n = match socket.read(&mut buf) {
+				let n = match socket.as_ref().unwrap().read(&mut buf) {
 					Ok(n) => n,
 					Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-						if let Ok(duration) = now.duration_since(*connect_time) {
-							if duration.as_secs() > 10 {
-								connecting.swap_remove(i);
-							}
-						} else {
-							i += 1;
+						if connect_time.elapsed().as_secs() < 10 {
+							return true;
 						}
-
-						continue;
+						return false;
 					}
-					Err(_) => {
-						connecting.swap_remove(i);
-						continue;
-					}
+					Err(_) => return false,
 				};
 
-				let mut socket = connecting.swap_remove(i).1;
-
+				let mut socket = socket.take().unwrap();
 				if n < 3 {
-					continue;
+					return false;
 				}
 
 				let request = match String::from_utf8(buf[..n].to_vec()) {
 					Ok(s) => s,
-					Err(_) => continue,
+					Err(_) => return false,
 				};
 
 				let mut split = request.split(',');
 
 				match split.next() {
 					Some(f) if f == "f" => (),
-					_ => continue,
+					_ => return false,
 				}
 
 				// Local IP
 				if let None = split.next() {
-					continue;
+					return false;
 				}
 
 				// World Name
 				let wrl = match split.next() {
 					Some(wrl) => wrl,
-					None => continue,
+					None => return false,
 				};
 
 				let wrl_bureaus = match self.bureaus.get_mut(wrl) {
 					Some(b) => b,
 					None => {
 						let _ = socket.write_all(b"f,9");
-						continue;
+						return false;
 					}
 				};
 
-				if let Some((port, _)) = wrl_bureaus.iter().find(|(_, b)| !b.is_full()) {
+				if let Some((port, _)) = wrl_bureaus
+					.iter()
+					.find(|(_, b)| b.get_user_count() < b.options.max_players)
+				{
 					let _ = socket
 						.write_all(format!("f,0,{},{}\0", self.options.host_name, port).as_bytes());
-					continue;
+					return false;
 				}
 
 				if (wrl_bureaus.len() as u32) < self.options.max_bureaus {
-					let bureau = match Bureau::new(
+					let bureau = match Bureau::spawn(
 						SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0),
 						self.options.bureau_options.clone(),
 					) {
@@ -143,7 +141,7 @@ impl Wls {
 						Err(io_err) => {
 							eprintln!("Bureau failed to start. {io_err}");
 							let _ = socket.write_all(b"f,9");
-							continue;
+							return false;
 						}
 					};
 
@@ -153,12 +151,23 @@ impl Wls {
 
 					wrl_bureaus.insert(bureau.port, bureau);
 				}
-			}
+				false
+			});
 
 			for (_, bureaus) in &mut self.bureaus {
-				for (_, _bureau) in bureaus {
-					// Close empty bureaus and receive signals here.
-				}
+				bureaus.retain(|_, bureau| {
+					if bureau.startup_time.elapsed().as_secs() > 10 && bureau.get_user_count() == 0
+					{
+						bureau.close();
+						if let Err(thread_err) = bureau.join() {
+							eprintln!("Bureau panicked! ({:?})", thread_err);
+						}
+
+						return false;
+					}
+
+					true
+				});
 			}
 
 			thread::sleep(Duration::from_millis(100))

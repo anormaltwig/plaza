@@ -14,17 +14,21 @@ use wls::{Wls, WlsOptions};
 
 #[derive(Parser)]
 struct Args {
-	/// If set, branch will function in WLS mode.
+	/// If set, program will function in WLS mode.
 	#[arg(short, long)]
 	wls: bool,
 
-	/// IP or Domain of server.
+	/// IP or Domain of the server.
 	#[arg(long, default_value_t = ("127.0.0.1").to_string())]
 	host_name: String,
 
 	/// Maximum number of bureaus per wrl to create in WLS mode.
 	#[arg(long, default_value_t = 3)]
 	max_bureaus: u32,
+
+	/// File path to a newline seperated list of wrls to allow in WLS mode.
+	#[arg(long)]
+	wrl_list: Option<String>,
 
 	/// Bureau/WLS port.
 	#[arg(short, long, default_value_t = 5126)]
@@ -52,6 +56,7 @@ fn main() {
 		if let Err(io_err) = Wls::start(WlsOptions {
 			max_bureaus: args.max_bureaus,
 			host_name: args.host_name,
+			wrl_list: args.wrl_list,
 			port: args.port,
 			bureau_options,
 		}) {
@@ -62,11 +67,11 @@ fn main() {
 	}
 
 	println!("Starting Bureau on port {}", args.port);
-	match Bureau::new(
+	match Bureau::spawn(
 		SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), args.port),
 		bureau_options,
 	) {
-		Ok(handle) => match handle.join() {
+		Ok(mut handle) => match handle.join() {
 			Ok(()) => (),
 			Err(thread_err) => eprintln!("Bureau panicked! ({:?})", thread_err),
 		},

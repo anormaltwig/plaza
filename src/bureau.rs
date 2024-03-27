@@ -4,11 +4,12 @@ use std::{
 	net::{TcpListener, ToSocketAddrs},
 	rc::Rc,
 	sync::{
+		atomic::{AtomicI32, Ordering},
 		mpsc::{self, Receiver, Sender, TryRecvError},
-		Arc, Mutex,
+		Arc,
 	},
 	thread::{self, JoinHandle},
-	time::{Duration, SystemTime},
+	time::{Duration, Instant},
 };
 
 use crate::{
@@ -19,11 +20,6 @@ use crate::{
 	user_list::UserList,
 };
 
-enum BureauSignal {
-	Close,
-	Empty,
-}
-
 #[derive(Clone)]
 pub struct BureauOptions {
 	pub max_players: i32,
@@ -32,47 +28,43 @@ pub struct BureauOptions {
 
 pub struct BureauHandle {
 	pub port: u16,
+	pub startup_time: Instant,
+	pub options: BureauOptions,
 
 	handle: Option<JoinHandle<()>>,
-	channel: (Sender<BureauSignal>, Option<Receiver<BureauSignal>>),
-	user_count: Arc<Mutex<i32>>,
-	options: BureauOptions,
+	close_sender: Sender<()>,
+	user_count: Arc<AtomicI32>,
 }
 
 impl BureauHandle {
-	pub fn close(&mut self) {
-		let _ = self.channel.0.send(BureauSignal::Close);
+	pub fn close(&self) {
+		let _ = self.close_sender.send(());
 	}
 
-	pub fn join(mut self) -> thread::Result<()> {
+	pub fn join(&mut self) -> thread::Result<()> {
 		self.handle
 			.take()
 			.expect("Tried to join invalid bureau.")
 			.join()
 	}
 
-	pub fn is_full(&self) -> bool {
-		let count = match self.user_count.lock() {
-			Ok(c) => *c,
-			Err(_) => return false,
-		};
-
-		count >= self.options.max_players
+	pub fn get_user_count(&self) -> i32 {
+		self.user_count.load(Ordering::Relaxed)
 	}
 }
 
 pub struct Bureau {
 	user_list: Rc<RefCell<UserList>>,
-	user_count: Arc<Mutex<i32>>,
+	user_count: Arc<AtomicI32>,
 	listener: TcpListener,
-	channel: (Receiver<BureauSignal>, Option<Sender<BureauSignal>>),
+	close_receiver: Receiver<()>,
 	options: BureauOptions,
 	lua_api: LuaApi,
 }
 
 impl Bureau {
 	/// Starts a new bureau and returns a special handle for its thread.
-	pub fn new<A>(addr: A, options: BureauOptions) -> io::Result<BureauHandle>
+	pub fn spawn<A>(addr: A, options: BureauOptions) -> io::Result<BureauHandle>
 	where
 		A: ToSocketAddrs,
 	{
@@ -81,13 +73,10 @@ impl Bureau {
 
 		let port = listener.local_addr()?.port();
 
-		let user_count = Arc::new(Mutex::new(0));
+		let user_count = Arc::new(AtomicI32::new(0));
 
 		// Handle -> Bureau
-		let (sender_a, receiver_a) = mpsc::channel();
-
-		// Bureau -> Handle
-		let (sender_b, receiver_b) = mpsc::channel();
+		let (sender, receiver) = mpsc::channel();
 
 		let handle = thread::spawn({
 			let options = options.clone();
@@ -104,7 +93,7 @@ impl Bureau {
 					user_list,
 					user_count,
 					listener,
-					channel: (receiver_a, Some(sender_b)),
+					close_receiver: receiver,
 					options,
 					lua_api,
 				}
@@ -113,11 +102,13 @@ impl Bureau {
 		});
 
 		Ok(BureauHandle {
-			handle: Some(handle),
 			port,
-			channel: (sender_a, Some(receiver_b)),
-			user_count,
+			close_sender: sender,
+			startup_time: Instant::now(),
 			options,
+
+			handle: Some(handle),
+			user_count,
 		})
 	}
 
@@ -125,23 +116,18 @@ impl Bureau {
 		let mut connecting = Vec::new();
 
 		loop {
-			match self.channel.0.try_recv() {
-				Ok(signal) => match signal {
-					BureauSignal::Close => break,
-					_ => (),
-				},
+			match self.close_receiver.try_recv() {
+				Ok(()) => break,
 				Err(TryRecvError::Disconnected) => break,
 				_ => (),
 			}
-
-			let now = SystemTime::now();
 
 			self.lua_api.think();
 
 			if let Ok((socket, addr)) = self.listener.accept() {
 				if self.lua_api.user_connecting(addr) {
 					if let Ok(()) = socket.set_nonblocking(true) {
-						connecting.push((now.clone(), socket));
+						connecting.push((Instant::now(), socket));
 					}
 				}
 			}
@@ -155,14 +141,10 @@ impl Bureau {
 				let n = match socket.read(&mut hello_buf) {
 					Ok(n) => n,
 					Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-						if let Ok(duration) = now.duration_since(*connect_time) {
-							if duration.as_secs() > 10 {
-								connecting.swap_remove(i);
-							} else {
-								i += 1;
-							}
-						} else {
+						if connect_time.elapsed().as_secs() > 10 {
 							connecting.swap_remove(i);
+						} else {
+							i += 1;
 						}
 
 						continue;
@@ -188,8 +170,8 @@ impl Bureau {
 
 				self.user_list.borrow_mut().new_user(socket);
 
-				let mut user_count = self.user_count.lock().unwrap();
-				*user_count = self.user_list.borrow().users.len() as i32;
+				let count = self.user_list.borrow().users.len() as i32;
+				self.user_count.store(count, Ordering::Relaxed);
 			}
 
 			// Handle connected users.
@@ -244,8 +226,8 @@ impl Bureau {
 			if removed {
 				self.broadcast_user_count();
 
-				let mut user_count = self.user_count.lock().unwrap();
-				*user_count = self.user_list.borrow().users.len() as i32;
+				let count = self.user_list.borrow().users.len() as i32;
+				self.user_count.store(count, Ordering::Relaxed);
 			}
 
 			thread::sleep(Duration::from_millis(100));

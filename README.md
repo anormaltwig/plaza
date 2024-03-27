@@ -12,5 +12,5 @@ See VSCP.md for more details!
 - [x] Fully implement ApplSpecific. (Probably correct.)
 - [ ] Logging system.
 - [x] Lua API (likely mlua or custom bindings).
-- [ ] WLS Implementation.
+- [x] WLS Implementation.
 
