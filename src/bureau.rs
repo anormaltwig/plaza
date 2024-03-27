@@ -127,44 +127,35 @@ impl Bureau {
 			if let Ok((socket, addr)) = self.listener.accept() {
 				if self.lua_api.user_connecting(addr) {
 					if let Ok(()) = socket.set_nonblocking(true) {
-						connecting.push((Instant::now(), socket));
+						connecting.push((Instant::now(), Some(socket)));
 					}
 				}
 			}
 
 			// Handling pending users.
-			let mut i = 0;
-			'outer: while i < connecting.len() {
-				let (connect_time, socket) = &mut connecting[i];
-
+			connecting.retain_mut(|(connect_time, socket)| {
 				let mut hello_buf = [0; 7];
-				let n = match socket.read(&mut hello_buf) {
+				let n = match socket.as_ref().unwrap().read(&mut hello_buf) {
 					Ok(n) => n,
 					Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-						if connect_time.elapsed().as_secs() > 10 {
-							connecting.swap_remove(i);
-						} else {
-							i += 1;
+						if connect_time.elapsed().as_secs() < 10 {
+							return true;
 						}
-
-						continue;
+						return false;
 					}
-					Err(_) => {
-						connecting.swap_remove(i);
-						continue;
-					}
+					Err(_) => return false,
 				};
 
-				let socket = connecting.swap_remove(i).1;
+				let socket = socket.take().unwrap();
 
 				if n < 7 {
-					continue;
+					return false;
 				}
 
 				for j in 0..7 {
 					// Last two bytes are vscp version.
 					if hello_buf[j] != b"hello\x01\x01"[j] {
-						continue 'outer;
+						return false;
 					}
 				}
 
@@ -172,7 +163,9 @@ impl Bureau {
 
 				let count = self.user_list.borrow().users.len() as i32;
 				self.user_count.store(count, Ordering::Relaxed);
-			}
+
+				false
+			});
 
 			// Handle connected users.
 			for (_id, user) in self.user_list.borrow().users.iter() {
