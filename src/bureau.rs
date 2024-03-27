@@ -3,7 +3,10 @@ use std::{
 	io::{self, Read},
 	net::{TcpListener, ToSocketAddrs},
 	rc::Rc,
-	sync::mpsc::{self, Receiver, Sender, TryRecvError},
+	sync::{
+		mpsc::{self, Receiver, Sender, TryRecvError},
+		Arc, Mutex,
+	},
 	thread::{self, JoinHandle},
 	time::{Duration, SystemTime},
 };
@@ -18,6 +21,7 @@ use crate::{
 
 enum BureauSignal {
 	Close,
+	Empty,
 }
 
 #[derive(Clone)]
@@ -27,13 +31,17 @@ pub struct BureauOptions {
 }
 
 pub struct BureauHandle {
+	pub port: u16,
+
 	handle: Option<JoinHandle<()>>,
-	signaller: Sender<BureauSignal>,
+	channel: (Sender<BureauSignal>, Option<Receiver<BureauSignal>>),
+	user_count: Arc<Mutex<i32>>,
+	options: BureauOptions,
 }
 
 impl BureauHandle {
 	pub fn close(&mut self) {
-		let _ = self.signaller.send(BureauSignal::Close);
+		let _ = self.channel.0.send(BureauSignal::Close);
 	}
 
 	pub fn join(mut self) -> thread::Result<()> {
@@ -42,12 +50,22 @@ impl BureauHandle {
 			.expect("Tried to join invalid bureau.")
 			.join()
 	}
+
+	pub fn is_full(&self) -> bool {
+		let count = match self.user_count.lock() {
+			Ok(c) => *c,
+			Err(_) => return false,
+		};
+
+		count >= self.options.max_players
+	}
 }
 
 pub struct Bureau {
 	user_list: Rc<RefCell<UserList>>,
+	user_count: Arc<Mutex<i32>>,
 	listener: TcpListener,
-	receiver: Receiver<BureauSignal>,
+	channel: (Receiver<BureauSignal>, Option<Sender<BureauSignal>>),
 	options: BureauOptions,
 	lua_api: LuaApi,
 }
@@ -61,28 +79,45 @@ impl Bureau {
 		let listener = TcpListener::bind(addr)?;
 		listener.set_nonblocking(true)?;
 
-		let (signaller, receiver) = mpsc::channel();
+		let port = listener.local_addr()?.port();
 
-		let handle = thread::spawn(|| {
-			let user_list = Rc::new(RefCell::new(UserList::new(options.max_players)));
-			let lua_api = match LuaApi::new(user_list.clone()) {
-				Ok(v) => v,
-				Err(e) => panic!("Failed to create lua api. {}", e),
-			};
+		let user_count = Arc::new(Mutex::new(0));
 
-			Bureau {
-				user_list,
-				listener,
-				receiver,
-				options,
-				lua_api,
+		// Handle -> Bureau
+		let (sender_a, receiver_a) = mpsc::channel();
+
+		// Bureau -> Handle
+		let (sender_b, receiver_b) = mpsc::channel();
+
+		let handle = thread::spawn({
+			let options = options.clone();
+			let user_count = user_count.clone();
+
+			|| {
+				let user_list = Rc::new(RefCell::new(UserList::new(options.max_players)));
+				let lua_api = match LuaApi::new(user_list.clone()) {
+					Ok(v) => v,
+					Err(e) => panic!("Failed to create lua api. {}", e),
+				};
+
+				Bureau {
+					user_list,
+					user_count,
+					listener,
+					channel: (receiver_a, Some(sender_b)),
+					options,
+					lua_api,
+				}
+				.run()
 			}
-			.run()
 		});
 
 		Ok(BureauHandle {
 			handle: Some(handle),
-			signaller,
+			port,
+			channel: (sender_a, Some(receiver_b)),
+			user_count,
+			options,
 		})
 	}
 
@@ -90,7 +125,7 @@ impl Bureau {
 		let mut connecting = Vec::new();
 
 		loop {
-			match self.receiver.try_recv() {
+			match self.channel.0.try_recv() {
 				Ok(signal) => match signal {
 					BureauSignal::Close => break,
 					_ => (),
@@ -152,6 +187,9 @@ impl Bureau {
 				}
 
 				self.user_list.borrow_mut().new_user(socket);
+
+				let mut user_count = self.user_count.lock().unwrap();
+				*user_count = self.user_list.borrow().users.len() as i32;
 			}
 
 			// Handle connected users.
@@ -205,6 +243,9 @@ impl Bureau {
 
 			if removed {
 				self.broadcast_user_count();
+
+				let mut user_count = self.user_count.lock().unwrap();
+				*user_count = self.user_list.borrow().users.len() as i32;
 			}
 
 			thread::sleep(Duration::from_millis(100));

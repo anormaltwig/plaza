@@ -22,11 +22,11 @@ struct Args {
 	#[arg(long, default_value_t = ("127.0.0.1").to_string())]
 	host_name: String,
 
-	/// Maximum number of bureaus to create in WLS mode.
-	#[arg(long, default_value_t = 5)]
+	/// Maximum number of bureaus per wrl to create in WLS mode.
+	#[arg(long, default_value_t = 3)]
 	max_bureaus: u32,
 
-	/// Bureau/WLS port. (WLS will use this as a starting index for new bureaus)
+	/// Bureau/WLS port.
 	#[arg(short, long, default_value_t = 5126)]
 	port: u16,
 

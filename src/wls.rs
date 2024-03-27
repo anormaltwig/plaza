@@ -1,12 +1,12 @@
 use std::{
-	collections::HashMap,
+	collections::{HashMap, HashSet},
 	io::{self, Read, Write},
 	net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener},
 	thread,
 	time::{Duration, SystemTime},
 };
 
-use crate::bureau::{BureauHandle, BureauOptions};
+use crate::bureau::{Bureau, BureauHandle, BureauOptions};
 
 pub struct WlsOptions {
 	pub max_bureaus: u32,
@@ -18,7 +18,7 @@ pub struct WlsOptions {
 pub struct Wls {
 	options: WlsOptions,
 	listener: TcpListener,
-	bureaus: HashMap<String, Vec<BureauHandle>>,
+	bureaus: HashMap<String, HashMap<u16, BureauHandle>>,
 }
 
 impl Wls {
@@ -29,14 +29,31 @@ impl Wls {
 		))?;
 		listener.set_nonblocking(true)?;
 
+		let mut bureaus = HashMap::new();
+		for wrl in Self::default_wrls() {
+			bureaus.insert(wrl, HashMap::new());
+		}
+
 		Self {
 			options,
 			listener,
-			bureaus: HashMap::new(),
+			bureaus,
 		}
 		.run();
 
 		Ok(())
+	}
+
+	fn default_wrls() -> HashSet<String> {
+		let mut list = HashSet::new();
+
+		list.insert("SAPARi COAST MIL.".to_string());
+		list.insert("SAPARi DOWNTOWN MIL.".to_string());
+		list.insert("HONJO JIDAIMURA MIL.".to_string());
+		list.insert("SAPARi PARK MIL.".to_string());
+		list.insert("SAPARi SPA".to_string());
+
+		list
 	}
 
 	fn run(&mut self) {
@@ -103,18 +120,44 @@ impl Wls {
 					None => continue,
 				};
 
-				if let Some(bureaus) = self.bureaus.get(wrl) {
-					if let Some(_bureau) = bureaus.iter().next() {
-						let _ = socket
-							.write_all(format!("f,0,{},5126\0", self.options.host_name).as_bytes());
+				let wrl_bureaus = match self.bureaus.get_mut(wrl) {
+					Some(b) => b,
+					None => {
+						let _ = socket.write_all(b"f,9");
 						continue;
 					}
+				};
+
+				if let Some((port, _)) = wrl_bureaus.iter().find(|(_, b)| !b.is_full()) {
+					let _ = socket
+						.write_all(format!("f,0,{},{}\0", self.options.host_name, port).as_bytes());
+					continue;
+				}
+
+				if (wrl_bureaus.len() as u32) < self.options.max_bureaus {
+					let bureau = match Bureau::new(
+						SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0),
+						self.options.bureau_options.clone(),
+					) {
+						Ok(b) => b,
+						Err(io_err) => {
+							eprintln!("Bureau failed to start. {io_err}");
+							let _ = socket.write_all(b"f,9");
+							continue;
+						}
+					};
+
+					let _ = socket.write_all(
+						format!("f,0,{},{}\0", self.options.host_name, bureau.port).as_bytes(),
+					);
+
+					wrl_bureaus.insert(bureau.port, bureau);
 				}
 			}
 
 			for (_, bureaus) in &mut self.bureaus {
-				for bureau in bureaus {
-					bureau.close()
+				for (_, _bureau) in bureaus {
+					// Close empty bureaus and receive signals here.
 				}
 			}
 
