@@ -4,6 +4,7 @@ use mlua::{ChunkMode, Function, Lua, RegistryKey, Table};
 
 use crate::{
 	math::{Mat3, Vector3},
+	protocol::ByteWriter,
 	user::User,
 	user_list::UserList,
 };
@@ -157,6 +158,25 @@ impl LuaApi {
 						.ok_or(mlua::Error::external("Tried to use invalid User."))?;
 
 					user.send_msg(&msg);
+
+					Ok(())
+				}
+			})?,
+		)?;
+
+		tbl.set(
+			"send_packet",
+			lua.create_function({
+				let user_list = user_list.clone();
+				move |_lua: &Lua, (id, msg): (i32, mlua::String)| {
+					let users = &user_list.borrow().users;
+					let user = users
+						.get(&id)
+						.ok_or(mlua::Error::external("Tried to use invalid User."))?;
+
+					user.send(&ByteWriter {
+						bytes: msg.as_bytes().to_vec(),
+					});
 
 					Ok(())
 				}

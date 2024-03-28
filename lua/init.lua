@@ -5,6 +5,7 @@ local get_pos = ftbl.get_pos
 local set_rot = ftbl.set_rot
 local get_rot = ftbl.get_rot
 local send_msg = ftbl.send_msg
+local send_packet = ftbl.send_packet
 local disconnect = ftbl.disconnect
 local get_peer_addr = ftbl.get_peer_addr
 
@@ -63,6 +64,12 @@ end
 ---@param msg string
 function user_meta:sendMsg(msg)
 	send_msg(self.id, msg)
+end
+
+--- Send a message to the User's chat.
+---@param msg string
+function user_meta:sendPacket(msg)
+	send_packet(self.id, msg)
 end
 
 local users = {}

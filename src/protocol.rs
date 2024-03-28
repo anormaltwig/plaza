@@ -97,7 +97,6 @@ pub struct ByteWriter {
 	pub bytes: Vec<u8>,
 }
 
-#[allow(dead_code)]
 impl ByteWriter {
 	pub fn new() -> ByteWriter {
 		ByteWriter { bytes: Vec::new() }
@@ -160,29 +159,7 @@ impl ByteWriter {
 		self
 	}
 
-	pub fn write_i16(mut self, n: i16) -> Self {
-		for b in n.to_be_bytes() {
-			self.bytes.push(b);
-		}
-
-		self
-	}
-
-	pub fn write_i8(mut self, n: i8) -> Self {
-		self.bytes.push(n as u8);
-
-		self
-	}
-
 	pub fn write_u32(mut self, n: u32) -> Self {
-		for b in n.to_be_bytes() {
-			self.bytes.push(b);
-		}
-
-		self
-	}
-
-	pub fn write_u16(mut self, n: u16) -> Self {
 		for b in n.to_be_bytes() {
 			self.bytes.push(b);
 		}
