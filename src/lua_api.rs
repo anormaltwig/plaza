@@ -25,6 +25,17 @@ pub struct LuaApi {
 	user_disconnect: RegistryKey,
 }
 
+macro_rules! borrow_user {
+	($ul:ident, $id:ident, $f:expr) => {{
+		let borrow = $ul.borrow();
+		let user = borrow
+			.users
+			.get(&$id)
+			.ok_or(mlua::Error::external("Tried to use invalid User."))?;
+		$f(user)
+	}};
+}
+
 impl LuaApi {
 	pub fn new(users: Rc<RefCell<UserList>>) -> anyhow::Result<Self> {
 		// I want to enable C modules. :3c
@@ -38,20 +49,17 @@ impl LuaApi {
 			.set_name("=branch")
 			.call(Self::create_funcs(&lua, users)?)?;
 
-		let think = lua.create_registry_value(fn_tbl.get::<_, Function>("think")?)?;
-		let user_connecting =
-			lua.create_registry_value(fn_tbl.get::<_, Function>("user_connecting")?)?;
-		let new_user = lua.create_registry_value(fn_tbl.get::<_, Function>("new_user")?)?;
-		let pos_update = lua.create_registry_value(fn_tbl.get::<_, Function>("pos_update")?)?;
-		let trans_update = lua.create_registry_value(fn_tbl.get::<_, Function>("trans_update")?)?;
-		let chat_send = lua.create_registry_value(fn_tbl.get::<_, Function>("chat_send")?)?;
-		let name_change = lua.create_registry_value(fn_tbl.get::<_, Function>("name_change")?)?;
-		let avatar_change =
-			lua.create_registry_value(fn_tbl.get::<_, Function>("avatar_change")?)?;
-		let aura_enter = lua.create_registry_value(fn_tbl.get::<_, Function>("aura_enter")?)?;
-		let aura_leave = lua.create_registry_value(fn_tbl.get::<_, Function>("aura_leave")?)?;
-		let user_disconnect =
-			lua.create_registry_value(fn_tbl.get::<_, Function>("user_disconnect")?)?;
+		let think = fn_tbl.get("think")?;
+		let user_connecting = fn_tbl.get("user_connecting")?;
+		let new_user = fn_tbl.get("new_user")?;
+		let pos_update = fn_tbl.get("pos_update")?;
+		let trans_update = fn_tbl.get("trans_update")?;
+		let chat_send = fn_tbl.get("chat_send")?;
+		let name_change = fn_tbl.get("name_change")?;
+		let avatar_change = fn_tbl.get("avatar_change")?;
+		let aura_enter = fn_tbl.get("aura_enter")?;
+		let aura_leave = fn_tbl.get("aura_leave")?;
+		let user_disconnect = fn_tbl.get("user_disconnect")?;
 
 		drop(fn_tbl);
 
@@ -84,12 +92,9 @@ impl LuaApi {
 			lua.create_function({
 				let user_list = user_list.clone();
 				move |_lua: &Lua, (id, x, y, z): (i32, f32, f32, f32)| {
-					let users = &user_list.borrow().users;
-					let user = users
-						.get(&id)
-						.ok_or(mlua::Error::external("Tried to use invalid User."))?;
-
-					user.set_pos(&Vector3::new(x, y, z));
+					borrow_user!(user_list, id, |user: &User| {
+						user.set_pos(&Vector3::new(x, y, z))
+					});
 
 					Ok(())
 				}
@@ -101,14 +106,10 @@ impl LuaApi {
 			lua.create_function({
 				let user_list = user_list.clone();
 				move |_lua: &Lua, id: i32| {
-					let users = &user_list.borrow().users;
-					let user = users
-						.get(&id)
-						.ok_or(mlua::Error::external("Tried to use invalid User."))?;
-
-					let pos = user.get_pos();
-
-					Ok((pos.x, pos.y, pos.z))
+					borrow_user!(user_list, id, |user: &User| {
+						let pos = user.get_pos();
+						Ok((pos.x, pos.y, pos.z))
+					})
 				}
 			})?,
 		)?;
@@ -118,14 +119,11 @@ impl LuaApi {
 			lua.create_function({
 				let user_list = user_list.clone();
 				move |_lua: &Lua, (id, arr): (i32, [f32; 9])| {
-					let users = &user_list.borrow().users;
-					let user = users
-						.get(&id)
-						.ok_or(mlua::Error::external("Tried to use invalid User."))?;
-
-					let mut m = Mat3::new();
-					m.data = arr;
-					user.set_rot(m);
+					borrow_user!(user_list, id, |user: &User| {
+						let mut m = Mat3::new();
+						m.data = arr;
+						user.set_rot(m);
+					});
 
 					Ok(())
 				}
@@ -137,12 +135,7 @@ impl LuaApi {
 			lua.create_function({
 				let user_list = user_list.clone();
 				move |_lua: &Lua, id: i32| {
-					let users = &user_list.borrow().users;
-					let user = users
-						.get(&id)
-						.ok_or(mlua::Error::external("Tried to use invalid User."))?;
-
-					Ok(user.get_rot().data)
+					borrow_user!(user_list, id, |user: &User| Ok(user.get_rot().data))
 				}
 			})?,
 		)?;
@@ -152,12 +145,7 @@ impl LuaApi {
 			lua.create_function({
 				let user_list = user_list.clone();
 				move |_lua: &Lua, (id, msg): (i32, String)| {
-					let users = &user_list.borrow().users;
-					let user = users
-						.get(&id)
-						.ok_or(mlua::Error::external("Tried to use invalid User."))?;
-
-					user.send_msg(&msg);
+					borrow_user!(user_list, id, |user: &User| user.send_msg(&msg));
 
 					Ok(())
 				}
@@ -169,14 +157,9 @@ impl LuaApi {
 			lua.create_function({
 				let user_list = user_list.clone();
 				move |_lua: &Lua, (id, msg): (i32, mlua::String)| {
-					let users = &user_list.borrow().users;
-					let user = users
-						.get(&id)
-						.ok_or(mlua::Error::external("Tried to use invalid User."))?;
-
-					user.send(&ByteWriter {
+					borrow_user!(user_list, id, |user: &User| user.send(&ByteWriter {
 						bytes: msg.as_bytes().to_vec(),
-					});
+					}));
 
 					Ok(())
 				}
@@ -188,12 +171,7 @@ impl LuaApi {
 			lua.create_function({
 				let user_list = user_list.clone();
 				move |_lua: &Lua, id: i32| {
-					let users = &user_list.borrow().users;
-					let user = users
-						.get(&id)
-						.ok_or(mlua::Error::external("Tried to use invalid User."))?;
-
-					user.disconnect();
+					borrow_user!(user_list, id, |user: &User| user.disconnect());
 
 					Ok(())
 				}
@@ -205,12 +183,9 @@ impl LuaApi {
 			lua.create_function({
 				let user_list = user_list.clone();
 				move |_lua: &Lua, id: i32| {
-					let users = &user_list.borrow().users;
-					let user = users
-						.get(&id)
-						.ok_or(mlua::Error::external("Tried to use invalid User."))?;
-
-					Ok(user.peer_addr()?.to_string())
+					borrow_user!(user_list, id, |user: &User| {
+						Ok(user.peer_addr()?.to_string())
+					})
 				}
 			})?,
 		)?;
