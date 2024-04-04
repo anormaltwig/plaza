@@ -27,6 +27,7 @@ Run a hook. Useful for letting other plugins know when something happens.
 | TransformUpdate | user: User | Called when a user sends their transform |
 | NameChange | user: User | Called every time someone changes their name |
 | AvatarChange | user: User | Called every time someone changes their avatar |
+| PrivateChat | user1: User, user2: User, msg: string | Called when user1 send a private chat message to user2 |
 | AuraEnter | a: User, b: User | Called when user a enters user b's aura |
 | AuraLeave | a: User, b: User | Called when user a leaves user b's aura |
 | UserDisconnect | user: User | Called when a user disconnects |

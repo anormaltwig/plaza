@@ -302,6 +302,18 @@ Every packet starts with a uint8 defining what type of packet it is followed imm
 | BroadcastId | 4 | int32 | The BroadcastId of the user who sent the message. |
 | Message | ~ | string | |
 
+#### Special Messages
+
+| Name | Description |
+| --- | --- |
+| %%REQ | First message sent by a user to request a private chat, also used as a keep-alive |
+| %%RINGING | Tell requesting user that they're being prompted for the request |
+| %%REJECT | Reject request |
+| %%ACCEPT | Accept request |
+| %%OK | Reply to `%%REQ` keep-alive |
+| %%BUSY | Tell requesting user that they are already in a private chat. |
+| %%SILENT | ??? Exists in code but doesn't seem to be sent anywhere. Any user receiving it results in 'Cannot Connect' being printed to their private chat window. |
+
 #### Notes
 
 - The id in the MsgCommon header is the id of the user the message is to be sent to.

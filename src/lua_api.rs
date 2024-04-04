@@ -20,6 +20,7 @@ pub struct LuaApi {
 	chat_send: RegistryKey,
 	name_change: RegistryKey,
 	avatar_change: RegistryKey,
+	private_chat: RegistryKey,
 	aura_enter: RegistryKey,
 	aura_leave: RegistryKey,
 	user_disconnect: RegistryKey,
@@ -57,6 +58,7 @@ impl LuaApi {
 		let chat_send = fn_tbl.get("chat_send")?;
 		let name_change = fn_tbl.get("name_change")?;
 		let avatar_change = fn_tbl.get("avatar_change")?;
+		let private_chat = fn_tbl.get("private_chat")?;
 		let aura_enter = fn_tbl.get("aura_enter")?;
 		let aura_leave = fn_tbl.get("aura_leave")?;
 		let user_disconnect = fn_tbl.get("user_disconnect")?;
@@ -74,6 +76,7 @@ impl LuaApi {
 			chat_send,
 			name_change,
 			avatar_change,
+			private_chat,
 			aura_enter,
 			aura_leave,
 			user_disconnect,
@@ -321,6 +324,21 @@ impl LuaApi {
 
 		if let Err(e) = avatar_change.call::<_, ()>((user.id, avatar)) {
 			eprintln!("Lua Error:\n{}", e);
+		}
+	}
+
+	pub fn private_chat(&self, user1: &User, user2: &User, msg: &str) -> Option<String> {
+		let private_chat = self
+			.lua
+			.registry_value::<Function>(&self.private_chat)
+			.ok()?;
+
+		match private_chat.call::<_, Option<String>>((user1.id, user2.id, msg)) {
+			Ok(r) => r,
+			Err(e) => {
+				eprintln!("Lua Error:\n{}", e);
+				None
+			}
 		}
 	}
 

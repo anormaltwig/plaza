@@ -499,12 +499,45 @@ impl Bureau {
 		)
 	}
 
-	fn private_chat(&self, user: &User, receiver: i32, text: String) {
+	fn private_chat(&self, user: &User, receiver: i32, mut text: String) {
 		let users = &self.user_list.borrow().users;
 		let other = match users.get(&receiver) {
 			Some(u) => u,
 			None => return,
 		};
+
+		let is_special = match text.as_str() {
+			"%%REQ" => true,
+			"%%RINGING" => true,
+			"%%REJECT" => true,
+			"%%ACCEPT" => true,
+			"%%OK" => true,
+			"%%BUSY" => true,
+			"%%END" => true,
+			_ => false,
+		};
+
+		if !is_special {
+			let mut msg = match text.split_once(": ") {
+				Some((_name, message)) => {
+					if message.len() == 0 {
+						return;
+					}
+					message.to_string()
+				}
+				None => return,
+			};
+
+			if let Some(msg_override) = self.lua_api.private_chat(user, other, &msg) {
+				if msg_override.len() == 0 {
+					return;
+				}
+
+				msg = msg_override;
+			}
+
+			text = format!("{}: {}", user.get_name(), msg).to_string();
+		}
 
 		other.send(&ByteWriter::message_common(
 			user.id,

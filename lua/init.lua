@@ -134,6 +134,9 @@ return {
 
 		return hook.call("AvatarChange", u, avatar, old)
 	end,
+	private_chat = function(id1, id2, msg)
+		return hook.call("PrivateChat", users[id1], users[id2], msg)
+	end,
 	aura_enter = function(id1, id2)
 		local u1 = users[id1]
 		local u2 = users[id2]
