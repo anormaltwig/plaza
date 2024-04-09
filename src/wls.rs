@@ -62,6 +62,8 @@ impl Wls {
 			"HONJO JIDAIMURA MIL.".to_string(),
 			"SAPARi PARK MIL.".to_string(),
 			"SAPARi SPA".to_string(),
+			"SAPARi GARDEN".to_string(),
+			"SAPARi HILLS".to_string(),
 		]
 	}
 
