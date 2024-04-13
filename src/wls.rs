@@ -158,8 +158,7 @@ impl Wls {
 
 			for (_, bureaus) in &mut self.bureaus {
 				bureaus.retain_mut(|(_, bureau)| {
-					if bureau.startup_time.elapsed().as_secs() > 10 && bureau.user_count() == 0
-					{
+					if bureau.startup_time.elapsed().as_secs() > 10 && bureau.user_count() == 0 {
 						bureau.close();
 						if let Err(thread_err) = bureau.join() {
 							eprintln!("Bureau panicked! ({:?})", thread_err);
