@@ -18,20 +18,20 @@ impl Vector3 {
 		self.z = z;
 	}
 
-	pub fn get_length_sqr(&self) -> f32 {
+	pub fn length_sqr(&self) -> f32 {
 		self.x.powi(2) + self.y.powi(2) + self.z.powi(2)
 	}
 
-	pub fn get_length(&self) -> f32 {
-		self.get_length_sqr().sqrt()
+	pub fn length(&self) -> f32 {
+		self.length_sqr().sqrt()
 	}
 
-	pub fn get_distance_sqr(&self, other: &Self) -> f32 {
-		(other - self).get_length_sqr()
+	pub fn distance_sqr(&self, other: &Self) -> f32 {
+		(other - self).length_sqr()
 	}
 
-	pub fn get_distance(&self, other: &Self) -> f32 {
-		(other - self).get_length()
+	pub fn distance(&self, other: &Self) -> f32 {
+		(other - self).length()
 	}
 }
 

@@ -25,7 +25,7 @@ impl UserList {
 	}
 
 	pub fn new_user(&mut self, mut socket: TcpStream) {
-		let id = match self.get_available_id() {
+		let id = match self.available_id() {
 			Some(id) => id,
 			None => return,
 		};
@@ -48,7 +48,7 @@ impl UserList {
 		}
 	}
 
-	pub fn get_master(&self) -> Option<&User> {
+	pub fn master(&self) -> Option<&User> {
 		let mut master_user = self.master_user.borrow_mut();
 
 		if let Some(master) = self.users.get(&master_user) {
@@ -68,7 +68,7 @@ impl UserList {
 		Some(master)
 	}
 
-	fn get_available_id(&mut self) -> Option<i32> {
+	fn available_id(&mut self) -> Option<i32> {
 		// Check values between 1 and max_players inclusive and return the first unused id
 		for i in 0..self.max_players {
 			let id = (self.user_index + i) % self.max_players + 1;

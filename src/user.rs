@@ -75,7 +75,7 @@ impl User {
 		self.internal.borrow_mut().position.set(pos.x, pos.y, pos.z);
 		self.send(&ByteWriter::position_update(self.id, pos));
 	}
-	pub fn get_pos(&self) -> Vector3 {
+	pub fn pos(&self) -> Vector3 {
 		self.internal.borrow().position.clone()
 	}
 
@@ -103,28 +103,28 @@ impl User {
 			&content,
 		));
 	}
-	pub fn get_rot(&self) -> Mat3 {
+	pub fn rot(&self) -> Mat3 {
 		self.internal.borrow().rotation.clone()
 	}
 
 	pub fn set_name(&self, name: String) {
 		self.internal.borrow_mut().username = name
 	}
-	pub fn get_name(&self) -> String {
+	pub fn name(&self) -> String {
 		self.internal.borrow().username.clone()
 	}
 
 	pub fn set_avatar(&self, avatar: String) {
 		self.internal.borrow_mut().avatar = avatar
 	}
-	pub fn get_avatar(&self) -> String {
+	pub fn avatar(&self) -> String {
 		self.internal.borrow().avatar.clone()
 	}
 
 	pub fn set_data(&self, data: String) {
 		self.internal.borrow_mut().data = data;
 	}
-	pub fn get_data(&self) -> String {
+	pub fn data(&self) -> String {
 		self.internal.borrow().data.clone()
 	}
 
@@ -138,7 +138,7 @@ impl User {
 	pub fn remove_aura(&self, id: &i32) -> bool {
 		self.internal.borrow_mut().aura.remove(id)
 	}
-	pub fn get_aura(&self) -> HashSet<i32> {
+	pub fn aura(&self) -> HashSet<i32> {
 		self.internal.borrow_mut().aura.clone()
 	}
 
@@ -241,7 +241,7 @@ impl User {
 			packet.read_f32(21),
 		);
 
-		Some((27, UserEvent::PositionUpdate(self.get_pos())))
+		Some((27, UserEvent::PositionUpdate(self.pos())))
 	}
 
 	/* General Message Receivers */
@@ -271,8 +271,8 @@ impl User {
 			&ByteWriter::new()
 				.write_i32(self.id)
 				.write_i32(self.id)
-				.write_string(&self.get_avatar())
-				.write_string(&self.get_name()),
+				.write_string(&self.avatar())
+				.write_string(&self.name()),
 		));
 
 		self.send(&ByteWriter::general_message(

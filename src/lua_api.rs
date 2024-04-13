@@ -110,7 +110,7 @@ impl LuaApi {
 				let user_list = user_list.clone();
 				move |_lua: &Lua, id: i32| {
 					borrow_user!(user_list, id, |user: &User| {
-						let pos = user.get_pos();
+						let pos = user.pos();
 						Ok((pos.x, pos.y, pos.z))
 					})
 				}
@@ -138,7 +138,7 @@ impl LuaApi {
 			lua.create_function({
 				let user_list = user_list.clone();
 				move |_lua: &Lua, id: i32| {
-					borrow_user!(user_list, id, |user: &User| Ok(user.get_rot().data))
+					borrow_user!(user_list, id, |user: &User| Ok(user.rot().data))
 				}
 			})?,
 		)?;

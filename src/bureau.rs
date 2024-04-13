@@ -48,7 +48,7 @@ impl BureauHandle {
 			.join()
 	}
 
-	pub fn get_user_count(&self) -> i32 {
+	pub fn user_count(&self) -> i32 {
 		self.user_count.load(Ordering::Relaxed)
 	}
 }
@@ -228,14 +228,14 @@ impl Bureau {
 	}
 
 	fn update_aura(&self, user: &User) {
-		let user_pos = user.get_pos();
+		let user_pos = user.pos();
 
 		for (id, other) in self.user_list.borrow().users.iter() {
 			if *id == user.id {
 				continue;
 			}
 
-			let dist = user_pos.get_distance_sqr(&other.get_pos());
+			let dist = user_pos.distance_sqr(&other.pos());
 
 			if user.check_aura(id) {
 				if dist > self.options.aura_radius.powi(2) {
@@ -272,8 +272,8 @@ impl Bureau {
 					&ByteWriter::new()
 						.write_i32(user.id)
 						.write_i32(user.id)
-						.write_string(&user.get_avatar())
-						.write_string(&user.get_name()),
+						.write_string(&user.avatar())
+						.write_string(&user.name()),
 				));
 				other.send(&ByteWriter::message_common(
 					other.id,
@@ -281,7 +281,7 @@ impl Bureau {
 					user.id,
 					MsgCommon::CharacterUpdate,
 					1,
-					&ByteWriter::new().write_string(&user.get_data()),
+					&ByteWriter::new().write_string(&user.data()),
 				));
 
 				// Send other to user
@@ -292,8 +292,8 @@ impl Bureau {
 					&ByteWriter::new()
 						.write_i32(other.id)
 						.write_i32(other.id)
-						.write_string(&other.get_avatar())
-						.write_string(&other.get_name()),
+						.write_string(&other.avatar())
+						.write_string(&other.name()),
 				));
 				user.send(&ByteWriter::message_common(
 					user.id,
@@ -301,7 +301,7 @@ impl Bureau {
 					other.id,
 					MsgCommon::CharacterUpdate,
 					1,
-					&ByteWriter::new().write_string(&other.get_data()),
+					&ByteWriter::new().write_string(&other.data()),
 				));
 
 				self.lua_api.aura_enter(user, other);
@@ -311,7 +311,7 @@ impl Bureau {
 
 	fn send_to_aura(&self, exluded: &User, stream: &ByteWriter) {
 		let users = &self.user_list.borrow().users;
-		for id in exluded.get_aura() {
+		for id in exluded.aura() {
 			let user = match users.get(&id) {
 				Some(u) => u,
 				None => continue,
@@ -323,7 +323,7 @@ impl Bureau {
 	fn send_to_aura_inclusive(&self, user: &User, stream: &ByteWriter) {
 		let users = &self.user_list.borrow().users;
 		user.send(stream);
-		for id in user.get_aura() {
+		for id in user.aura() {
 			let other = match users.get(&id) {
 				Some(u) => u,
 				None => continue,
@@ -351,7 +351,7 @@ impl Bureau {
 
 	fn disconnect_user(&self, user: &User) {
 		let users = &self.user_list.borrow().users;
-		for id in user.get_aura() {
+		for id in user.aura() {
 			let other = match users.get(&id) {
 				Some(u) => u,
 				None => continue,
@@ -382,7 +382,7 @@ impl Bureau {
 	fn new_user(&self, user: &User, name: String, avatar: String) {
 		self.lua_api.new_user(user, &name, &avatar);
 
-		match self.user_list.borrow().get_master() {
+		match self.user_list.borrow().master() {
 			Some(master) => {
 				if user.id != master.id {
 					user.send(&ByteWriter::general_message(
@@ -438,7 +438,7 @@ impl Bureau {
 			msg = msg_override;
 		}
 
-		let text = format!("{}: {}", user.get_name(), msg).to_string();
+		let text = format!("{}: {}", user.name(), msg).to_string();
 
 		self.send_to_others(
 			user,
@@ -536,7 +536,7 @@ impl Bureau {
 				msg = msg_override;
 			}
 
-			text = format!("{}: {}", user.get_name(), msg).to_string();
+			text = format!("{}: {}", user.name(), msg).to_string();
 		}
 
 		other.send(&ByteWriter::message_common(
@@ -576,7 +576,7 @@ impl Bureau {
 				// This could be wrong... :3c
 				0 | 3 | 5 => self.send_to_all(&stream),
 				1 | 4 | 6 => self.send_to_others(user, &stream),
-				2 => match self.user_list.borrow().get_master() {
+				2 => match self.user_list.borrow().master() {
 					Some(master) => master.send(&stream),
 					None => return,
 				},

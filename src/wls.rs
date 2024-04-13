@@ -20,7 +20,7 @@ pub struct WlsOptions {
 pub struct Wls {
 	options: WlsOptions,
 	listener: TcpListener,
-	bureaus: HashMap<String, HashMap<u16, BureauHandle>>,
+	bureaus: HashMap<String, Vec<(u16, BureauHandle)>>,
 }
 
 impl Wls {
@@ -42,7 +42,7 @@ impl Wls {
 		};
 
 		for wrl in wrls {
-			bureaus.insert(wrl, HashMap::new());
+			bureaus.insert(wrl, Vec::new());
 		}
 
 		Self {
@@ -127,7 +127,7 @@ impl Wls {
 
 				if let Some((port, _)) = wrl_bureaus
 					.iter()
-					.find(|(_, b)| b.get_user_count() < b.options.max_players)
+					.find(|(_, b)| b.user_count() < b.options.max_players)
 				{
 					let _ = socket
 						.write_all(format!("f,0,{},{}\0", self.options.host_name, port).as_bytes());
@@ -151,14 +151,14 @@ impl Wls {
 						format!("f,0,{},{}\0", self.options.host_name, bureau.port).as_bytes(),
 					);
 
-					wrl_bureaus.insert(bureau.port, bureau);
+					wrl_bureaus.push((bureau.port, bureau));
 				}
 				false
 			});
 
 			for (_, bureaus) in &mut self.bureaus {
-				bureaus.retain(|_, bureau| {
-					if bureau.startup_time.elapsed().as_secs() > 10 && bureau.get_user_count() == 0
+				bureaus.retain_mut(|(_, bureau)| {
+					if bureau.startup_time.elapsed().as_secs() > 10 && bureau.user_count() == 0
 					{
 						bureau.close();
 						if let Err(thread_err) = bureau.join() {
