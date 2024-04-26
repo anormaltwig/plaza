@@ -189,7 +189,7 @@ impl LuaApi {
 			lua.create_function({
 				let user_list = user_list.clone();
 				move |_lua: &Lua, id: i32| {
-					borrow_user!(user_list, id, user, { Ok(user.peer_addr()?.to_string()) })
+					borrow_user!(user_list, id, user, Ok(user.peer_addr()?.to_string()))
 				}
 			})?,
 		)?;
