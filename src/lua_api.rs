@@ -137,9 +137,7 @@ impl LuaApi {
 			"get_rot",
 			lua.create_function({
 				let user_list = user_list.clone();
-				move |_lua: &Lua, id: i32| {
-					borrow_user!(user_list, id, user, Ok(user.rot().data))
-				}
+				move |_lua: &Lua, id: i32| borrow_user!(user_list, id, user, Ok(user.rot().data))
 			})?,
 		)?;
 
@@ -160,9 +158,14 @@ impl LuaApi {
 			lua.create_function({
 				let user_list = user_list.clone();
 				move |_lua: &Lua, (id, msg): (i32, mlua::String)| {
-					borrow_user!(user_list, id, user, user.send(&ByteWriter {
-						bytes: msg.as_bytes().to_vec(),
-					}));
+					borrow_user!(
+						user_list,
+						id,
+						user,
+						user.send(&ByteWriter {
+							bytes: msg.as_bytes().to_vec(),
+						})
+					);
 
 					Ok(())
 				}
@@ -186,9 +189,7 @@ impl LuaApi {
 			lua.create_function({
 				let user_list = user_list.clone();
 				move |_lua: &Lua, id: i32| {
-					borrow_user!(user_list, id, user, {
-						Ok(user.peer_addr()?.to_string())
-					})
+					borrow_user!(user_list, id, user, { Ok(user.peer_addr()?.to_string()) })
 				}
 			})?,
 		)?;

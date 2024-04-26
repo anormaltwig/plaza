@@ -172,18 +172,14 @@ impl Bureau {
 				if let Some(events) = user.poll() {
 					for event in events {
 						match event {
-							UserEvent::NewUser(name, avatar) => {
-								self.new_user(user, name, avatar)
-							}
+							UserEvent::NewUser(name, avatar) => self.new_user(user, name, avatar),
 							UserEvent::StateChange => (),
 							UserEvent::PositionUpdate(pos) => self.position_update(user, pos),
 							UserEvent::TransformUpdate(mat, pos) => {
 								self.transform_update(user, mat, pos)
 							}
 							UserEvent::ChatSend(msg) => self.chat_send(user, msg),
-							UserEvent::CharacterUpdate(data) => {
-								self.character_update(user, data)
-							}
+							UserEvent::CharacterUpdate(data) => self.character_update(user, data),
 							UserEvent::NameChange(name) => self.name_change(user, name),
 							UserEvent::AvatarChange(avatar) => self.avatar_change(user, avatar),
 							UserEvent::PrivateChat(receiver, msg) => {
@@ -500,14 +496,9 @@ impl Bureau {
 			None => return,
 		};
 
-		let is_special = matches!(text.as_str(),
-			"%%REQ" |
-			"%%RINGING" |
-			"%%REJECT" |
-			"%%ACCEPT" |
-			"%%OK" |
-			"%%BUSY" |
-			"%%END"
+		let is_special = matches!(
+			text.as_str(),
+			"%%REQ" | "%%RINGING" | "%%REJECT" | "%%ACCEPT" | "%%OK" | "%%BUSY" | "%%END"
 		);
 
 		if !is_special {
