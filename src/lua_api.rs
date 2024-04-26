@@ -27,13 +27,13 @@ pub struct LuaApi {
 }
 
 macro_rules! borrow_user {
-	($ul:ident, $id:ident, $f:expr) => {{
+	($ul:ident, $id:ident, $u:ident, $f:expr) => {{
 		let borrow = $ul.borrow();
-		let user = borrow
+		let $u = borrow
 			.users
 			.get(&$id)
 			.ok_or(mlua::Error::external("Tried to use invalid User."))?;
-		$f(user)
+		$f
 	}};
 }
 
@@ -95,7 +95,7 @@ impl LuaApi {
 			lua.create_function({
 				let user_list = user_list.clone();
 				move |_lua: &Lua, (id, x, y, z): (i32, f32, f32, f32)| {
-					borrow_user!(user_list, id, |user: &User| {
+					borrow_user!(user_list, id, user, {
 						user.set_pos(&Vector3::new(x, y, z))
 					});
 
@@ -109,7 +109,7 @@ impl LuaApi {
 			lua.create_function({
 				let user_list = user_list.clone();
 				move |_lua: &Lua, id: i32| {
-					borrow_user!(user_list, id, |user: &User| {
+					borrow_user!(user_list, id, user, {
 						let pos = user.pos();
 						Ok((pos.x, pos.y, pos.z))
 					})
@@ -122,7 +122,7 @@ impl LuaApi {
 			lua.create_function({
 				let user_list = user_list.clone();
 				move |_lua: &Lua, (id, arr): (i32, [f32; 9])| {
-					borrow_user!(user_list, id, |user: &User| {
+					borrow_user!(user_list, id, user, {
 						let mut m = Mat3::new();
 						m.data = arr;
 						user.set_rot(m);
@@ -138,7 +138,7 @@ impl LuaApi {
 			lua.create_function({
 				let user_list = user_list.clone();
 				move |_lua: &Lua, id: i32| {
-					borrow_user!(user_list, id, |user: &User| Ok(user.rot().data))
+					borrow_user!(user_list, id, user, Ok(user.rot().data))
 				}
 			})?,
 		)?;
@@ -148,7 +148,7 @@ impl LuaApi {
 			lua.create_function({
 				let user_list = user_list.clone();
 				move |_lua: &Lua, (id, msg): (i32, String)| {
-					borrow_user!(user_list, id, |user: &User| user.send_msg(&msg));
+					borrow_user!(user_list, id, user, user.send_msg(&msg));
 
 					Ok(())
 				}
@@ -160,7 +160,7 @@ impl LuaApi {
 			lua.create_function({
 				let user_list = user_list.clone();
 				move |_lua: &Lua, (id, msg): (i32, mlua::String)| {
-					borrow_user!(user_list, id, |user: &User| user.send(&ByteWriter {
+					borrow_user!(user_list, id, user, user.send(&ByteWriter {
 						bytes: msg.as_bytes().to_vec(),
 					}));
 
@@ -174,7 +174,7 @@ impl LuaApi {
 			lua.create_function({
 				let user_list = user_list.clone();
 				move |_lua: &Lua, id: i32| {
-					borrow_user!(user_list, id, |user: &User| user.disconnect());
+					borrow_user!(user_list, id, user, user.disconnect());
 
 					Ok(())
 				}
@@ -186,7 +186,7 @@ impl LuaApi {
 			lua.create_function({
 				let user_list = user_list.clone();
 				move |_lua: &Lua, id: i32| {
-					borrow_user!(user_list, id, |user: &User| {
+					borrow_user!(user_list, id, user, {
 						Ok(user.peer_addr()?.to_string())
 					})
 				}
@@ -249,10 +249,7 @@ impl LuaApi {
 		};
 
 		match user_connecting.call::<_, Option<bool>>(addr.to_string()) {
-			Ok(opt) => match opt {
-				Some(b) => b,
-				None => true,
-			},
+			Ok(opt) => opt.unwrap_or(true),
 			Err(e) => {
 				eprintln!("Lua Error:\n{}", e);
 				true

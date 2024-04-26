@@ -135,7 +135,7 @@ impl Bureau {
 			// Handling pending users.
 			connecting.retain_mut(|(connect_time, socket)| {
 				let mut hello_buf = [0; 7];
-				let n = match socket.as_ref().unwrap().read(&mut hello_buf) {
+				let n = match socket.as_mut().unwrap().read(&mut hello_buf) {
 					Ok(n) => n,
 					Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
 						if connect_time.elapsed().as_secs() < 10 {
@@ -152,9 +152,9 @@ impl Bureau {
 					return false;
 				}
 
-				for j in 0..7 {
+				for (i, b) in hello_buf.iter().enumerate() {
 					// Last two bytes are vscp version.
-					if hello_buf[j] != b"hello\x01\x01"[j] {
+					if *b != b"hello\x01\x01"[i] {
 						return false;
 					}
 				}
@@ -169,38 +169,35 @@ impl Bureau {
 
 			// Handle connected users.
 			for (_id, user) in self.user_list.borrow().users.iter() {
-				match user.poll() {
-					Some(events) => {
-						for event in events {
-							match event {
-								UserEvent::NewUser(name, avatar) => {
-									self.new_user(user, name, avatar)
-								}
-								UserEvent::StateChange => (),
-								UserEvent::PositionUpdate(pos) => self.position_update(user, pos),
-								UserEvent::TransformUpdate(mat, pos) => {
-									self.transform_update(user, mat, pos)
-								}
-								UserEvent::ChatSend(msg) => self.chat_send(user, msg),
-								UserEvent::CharacterUpdate(data) => {
-									self.character_update(user, data)
-								}
-								UserEvent::NameChange(name) => self.name_change(user, name),
-								UserEvent::AvatarChange(avatar) => self.avatar_change(user, avatar),
-								UserEvent::PrivateChat(receiver, msg) => {
-									self.private_chat(user, receiver, msg)
-								}
-								UserEvent::ApplSpecific(strategy, id, method, strarg, intarg) => {
-									self.appl_specific(user, strategy, id, method, strarg, intarg)
-								}
+				if let Some(events) = user.poll() {
+					for event in events {
+						match event {
+							UserEvent::NewUser(name, avatar) => {
+								self.new_user(user, name, avatar)
+							}
+							UserEvent::StateChange => (),
+							UserEvent::PositionUpdate(pos) => self.position_update(user, pos),
+							UserEvent::TransformUpdate(mat, pos) => {
+								self.transform_update(user, mat, pos)
+							}
+							UserEvent::ChatSend(msg) => self.chat_send(user, msg),
+							UserEvent::CharacterUpdate(data) => {
+								self.character_update(user, data)
+							}
+							UserEvent::NameChange(name) => self.name_change(user, name),
+							UserEvent::AvatarChange(avatar) => self.avatar_change(user, avatar),
+							UserEvent::PrivateChat(receiver, msg) => {
+								self.private_chat(user, receiver, msg)
+							}
+							UserEvent::ApplSpecific(strategy, id, method, strarg, intarg) => {
+								self.appl_specific(user, strategy, id, method, strarg, intarg)
 							}
 						}
 					}
-					None => (),
 				}
 
 				if !user.is_connected() {
-					self.disconnect_user(&user);
+					self.disconnect_user(user);
 				}
 			}
 
@@ -382,19 +379,16 @@ impl Bureau {
 	fn new_user(&self, user: &User, name: String, avatar: String) {
 		self.lua_api.new_user(user, &name, &avatar);
 
-		match self.user_list.borrow().master() {
-			Some(master) => {
-				if user.id != master.id {
-					user.send(&ByteWriter::general_message(
-						user.id,
-						user.id,
-						Opcode::SMsgSetMaster,
-						&ByteWriter::new().write_u8(0),
-					));
-				}
+		if let Some(master) = self.user_list.borrow().master() {
+			if user.id != master.id {
+				user.send(&ByteWriter::general_message(
+					user.id,
+					user.id,
+					Opcode::SMsgSetMaster,
+					&ByteWriter::new().write_u8(0),
+				));
 			}
-			None => (), // Unreachable?
-		};
+		}
 
 		self.broadcast_user_count();
 	}
@@ -431,7 +425,7 @@ impl Bureau {
 
 	fn chat_send(&self, user: &User, mut msg: String) {
 		if let Some(msg_override) = self.lua_api.chat_send(user, &msg) {
-			if msg_override.len() == 0 {
+			if msg_override.is_empty() {
 				return;
 			}
 
@@ -506,21 +500,20 @@ impl Bureau {
 			None => return,
 		};
 
-		let is_special = match text.as_str() {
-			"%%REQ" => true,
-			"%%RINGING" => true,
-			"%%REJECT" => true,
-			"%%ACCEPT" => true,
-			"%%OK" => true,
-			"%%BUSY" => true,
-			"%%END" => true,
-			_ => false,
-		};
+		let is_special = matches!(text.as_str(),
+			"%%REQ" |
+			"%%RINGING" |
+			"%%REJECT" |
+			"%%ACCEPT" |
+			"%%OK" |
+			"%%BUSY" |
+			"%%END"
+		);
 
 		if !is_special {
 			let mut msg = match text.split_once(": ") {
 				Some((_name, message)) => {
-					if message.len() == 0 {
+					if message.is_empty() {
 						return;
 					}
 					message.to_string()
@@ -529,7 +522,7 @@ impl Bureau {
 			};
 
 			if let Some(msg_override) = self.lua_api.private_chat(user, other, &msg) {
-				if msg_override.len() == 0 {
+				if msg_override.is_empty() {
 					return;
 				}
 

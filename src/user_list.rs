@@ -20,7 +20,7 @@ impl UserList {
 
 			user_index: 0,
 			master_user: RefCell::new(-1),
-			max_players: max_players.clamp(1, 2 ^ 31 - 1),
+			max_players: max_players.clamp(1, (2 ^ 31) - 1),
 		}
 	}
 
@@ -30,12 +30,7 @@ impl UserList {
 			None => return,
 		};
 
-		let buf = [
-			&b"hello\0"[..],
-			&id.to_be_bytes()[..],
-			&id.to_be_bytes()[..],
-		]
-		.concat();
+		let buf = [&b"hello\0"[..], &id.to_be_bytes(), &id.to_be_bytes()].concat();
 
 		if let Ok(n) = socket.write(&buf) {
 			if n != buf.len() {

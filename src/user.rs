@@ -68,7 +68,7 @@ impl User {
 	}
 
 	pub fn peer_addr(&self) -> io::Result<SocketAddr> {
-		Ok(self.internal.borrow().socket.peer_addr()?)
+		self.internal.borrow().socket.peer_addr()
 	}
 
 	pub fn set_pos(&self, pos: &Vector3) {
@@ -156,7 +156,7 @@ impl User {
 	pub fn send(&self, stream: &ByteWriter) {
 		let mut internal = self.internal.borrow_mut();
 
-		if let Err(_) = internal.socket.write_all(&stream.bytes) {
+		if internal.socket.write_all(&stream.bytes).is_err() {
 			internal.connected = false;
 		}
 	}
@@ -347,7 +347,7 @@ impl User {
 
 		// Don't send empty messages.
 		let (_name, message) = text.split_once(": ")?;
-		if message.len() == 0 {
+		if message.is_empty() {
 			return None;
 		}
 

@@ -36,7 +36,7 @@ impl Wls {
 		let wrls = match &options.wrl_list {
 			Some(path) => {
 				let reader = BufReader::new(File::open(path)?);
-				reader.lines().filter_map(|line| Some(line.ok()?)).collect()
+				reader.lines().map_while(Result::ok).collect()
 			}
 			None => Self::default_wrls(),
 		};
@@ -102,12 +102,12 @@ impl Wls {
 				let mut split = request.split(',');
 
 				match split.next() {
-					Some(f) if f == "f" => (),
+					Some("f") => (),
 					_ => return false,
 				}
 
 				// Local IP
-				if let None = split.next() {
+				if split.next().is_none() {
 					return false;
 				}
 
@@ -156,7 +156,7 @@ impl Wls {
 				false
 			});
 
-			for (_, bureaus) in &mut self.bureaus {
+			for bureaus in self.bureaus.values_mut() {
 				bureaus.retain_mut(|(_, bureau)| {
 					if bureau.startup_time.elapsed().as_secs() > 10 && bureau.user_count() == 0 {
 						bureau.close();

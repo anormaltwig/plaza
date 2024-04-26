@@ -39,7 +39,7 @@ pub trait ByteReader {
 
 impl ByteReader for [u8] {
 	fn read_string(&self, start: usize) -> String {
-		let mut buf = vec![0; self.len().checked_sub(start).unwrap_or(0)];
+		let mut buf = vec![0; self.len().saturating_sub(start)];
 		let mut i = 0;
 		for b in &self[start..] {
 			let b = *b;
@@ -50,7 +50,7 @@ impl ByteReader for [u8] {
 			i += 1;
 		}
 
-		String::from_utf8(buf[..i].to_vec()).unwrap_or(String::new())
+		String::from_utf8(buf[..i].to_vec()).unwrap_or_default()
 	}
 
 	fn read_f32(&self, start: usize) -> f32 {
@@ -115,7 +115,7 @@ impl ByteWriter {
 	}
 
 	pub fn position_update(id: i32, pos: &Vector3) -> ByteWriter {
-		let stream = Self::new()
+		Self::new()
 			.write_u8(2)
 			.write_i32(id)
 			.write_i32(id)
@@ -125,9 +125,7 @@ impl ByteWriter {
 			.write_f32(pos.z)
 			// ???
 			.write_u8(1)
-			.write_u8(0);
-
-		stream
+			.write_u8(0)
 	}
 
 	pub fn message_common(
