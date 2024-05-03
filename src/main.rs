@@ -1,16 +1,13 @@
 mod bureau;
-mod lua_api;
-mod math;
-mod protocol;
-mod user;
-mod user_list;
 mod wls;
 
 use clap::Parser;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-use bureau::{Bureau, BureauOptions};
-use wls::{Wls, WlsOptions};
+use crate::{
+	bureau::{Bureau, BureauOptions},
+	wls::WlsOptions,
+};
 
 #[derive(Parser)]
 struct Args {
@@ -24,7 +21,7 @@ struct Args {
 
 	/// Maximum number of bureaus per wrl to create in WLS mode.
 	#[arg(long, default_value_t = 3)]
-	max_bureaus: u32,
+	max_bureaus: usize,
 
 	/// File path to a newline seperated list of wrls to allow in WLS mode.
 	#[arg(long)]
@@ -51,30 +48,35 @@ fn main() {
 		aura_radius: args.aura_radius,
 	};
 
+	let bind_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), args.port);
+
 	if args.wls {
-		println!("Starting WLS on port {}", args.port);
-		if let Err(io_err) = Wls::start(WlsOptions {
-			max_bureaus: args.max_bureaus,
-			host_name: args.host_name,
-			wrl_list: args.wrl_list,
-			port: args.port,
-			bureau_options,
-		}) {
-			eprintln!("WLS failed to start. {}", io_err);
-		}
+		// Never returns unless it errors.
+		let err = wls::run(
+			bind_addr,
+			WlsOptions {
+				host_name: args.host_name,
+				max_bureaus: args.max_bureaus,
+				wrl_list: args.wrl_list,
+				bureau_options,
+			},
+		)
+		.unwrap_err();
+
+		eprintln!("Failed to run WLS: {}", err);
 
 		return;
 	}
 
-	println!("Starting Bureau on port {}", args.port);
-	match Bureau::spawn(
-		SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), args.port),
-		bureau_options,
-	) {
-		Ok(mut handle) => match handle.join() {
-			Ok(()) => (),
-			Err(thread_err) => eprintln!("Bureau panicked! ({:?})", thread_err),
-		},
-		Err(io_err) => eprintln!("Bureau failed to start. {}", io_err),
-	}
+	let mut bureau = match Bureau::new(bind_addr, bureau_options) {
+		Ok(bureau) => bureau,
+		Err(err) => {
+			eprintln!("Failed to run Bureau: '{}'.", err);
+
+			return;
+		}
+	};
+
+	println!("Bureau running on port: {}.", bureau.port);
+	bureau.run();
 }

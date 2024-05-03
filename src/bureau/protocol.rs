@@ -1,16 +1,15 @@
-use crate::math::Vector3;
+use super::math::Vector3;
 
-#[allow(dead_code)]
 #[repr(u32)]
 pub enum Opcode {
-	CMsgNewUser = 0,
+	// CMsgNewUser = 0,
 	SMsgClientId = 1,
 	SMsgUserJoined = 2,
 	SMsgUserLeft = 3,
 	SMsgBroadcastId = 4,
 
 	MsgCommon = 6,
-	CMsgStateChange = 7,
+	// CMsgStateChange = 7,
 	SMsgSetMaster = 8,
 
 	SMsgUserCount = 11,
@@ -27,7 +26,35 @@ pub enum MsgCommon {
 	ApplSpecific = 10000,
 }
 
-/// Easily read values from an incoming packet.
+#[repr(u8)]
+#[derive(Clone, Copy)]
+pub enum Strategy {
+	AuraClients = 0,
+	AuraClientsExceptSender = 1,
+	SpecificClient = 2,
+	AllClients = 3,
+	AllClientsExceptSender = 4,
+	Unknown5 = 5,
+	Unknown6 = 6,
+
+	Invalid = u8::MAX,
+}
+
+impl From<u8> for Strategy {
+	fn from(value: u8) -> Self {
+		match value {
+			0 => Strategy::AuraClients,
+			1 => Strategy::AuraClientsExceptSender,
+			2 => Strategy::SpecificClient,
+			3 => Strategy::AllClients,
+			4 => Strategy::AllClientsExceptSender,
+			5 => Strategy::Unknown5,
+			6 => Strategy::Unknown6,
+			_ => Strategy::Invalid,
+		}
+	}
+}
+
 pub trait ByteReader {
 	fn read_string(&self, start: usize) -> String;
 	fn read_f32(&self, start: usize) -> f32;
@@ -98,24 +125,24 @@ pub struct ByteWriter {
 }
 
 impl ByteWriter {
-	pub fn new() -> ByteWriter {
-		ByteWriter { bytes: Vec::new() }
+	pub fn new(n: usize) -> Self {
+		Self {
+			bytes: Vec::with_capacity(n),
+		}
 	}
 
-	pub fn general_message(id1: i32, id2: i32, opcode: Opcode, content: &ByteWriter) -> ByteWriter {
-		let mut stream = Self::new()
+	pub fn general_message(id1: i32, id2: i32, opcode: Opcode, content: &[u8]) -> Self {
+		Self::new(17 + content.len())
 			.write_u8(0)
 			.write_i32(id1)
 			.write_i32(id2)
 			.write_u32(opcode as u32)
-			.write_u32(content.bytes.len() as u32);
-		stream.bytes.extend(&content.bytes);
-
-		stream
+			.write_u32(content.len() as u32)
+			.write_arr(content)
 	}
 
-	pub fn position_update(id: i32, pos: &Vector3) -> ByteWriter {
-		Self::new()
+	pub fn position_update(id: i32, pos: &Vector3) -> Self {
+		Self::new(27)
 			.write_u8(2)
 			.write_i32(id)
 			.write_i32(id)
@@ -131,18 +158,21 @@ impl ByteWriter {
 	pub fn message_common(
 		id1: i32,
 		id2: i32,
-		id3: i32,
 		msg_type: MsgCommon,
-		strategy: u8,
-		content: &ByteWriter,
-	) -> ByteWriter {
-		let common = Self::new()
-			.write_i32(id3)
-			.write_u32(msg_type as u32)
-			.write_u8(strategy)
-			.write_arr(&content.bytes);
-
-		Self::general_message(id1, id2, Opcode::MsgCommon, &common)
+		strategy: Strategy,
+		content: &[u8],
+	) -> Self {
+		Self::general_message(
+			id1,
+			id1,
+			Opcode::MsgCommon,
+			&Self::new(9 + content.len())
+				.write_i32(id2)
+				.write_u32(msg_type as u32)
+				.write_u8(strategy as u8)
+				.write_arr(content)
+				.bytes,
+		)
 	}
 
 	pub fn write_f32(self, n: f32) -> Self {
@@ -150,17 +180,13 @@ impl ByteWriter {
 	}
 
 	pub fn write_i32(mut self, n: i32) -> Self {
-		for b in n.to_be_bytes() {
-			self.bytes.push(b);
-		}
+		self.bytes.extend(n.to_be_bytes());
 
 		self
 	}
 
 	pub fn write_u32(mut self, n: u32) -> Self {
-		for b in n.to_be_bytes() {
-			self.bytes.push(b);
-		}
+		self.bytes.extend(n.to_be_bytes());
 
 		self
 	}
@@ -173,18 +199,14 @@ impl ByteWriter {
 
 	/// Write every byte of `arr` to the stream.
 	pub fn write_arr(mut self, arr: &[u8]) -> Self {
-		for b in arr {
-			self.bytes.push(*b);
-		}
+		self.bytes.extend(arr);
 
 		self
 	}
 
 	/// Writes a string to the stream that's terminated by null.
 	pub fn write_string(mut self, s: &str) -> Self {
-		for b in s.as_bytes() {
-			self.bytes.push(*b);
-		}
+		self.bytes.extend(s.as_bytes());
 		self.bytes.push(0); // Append null char.
 
 		self
