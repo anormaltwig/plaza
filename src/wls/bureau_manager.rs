@@ -38,12 +38,12 @@ impl BureauManager {
 		if let Some(bureau_ex) = self.bureaus.iter().find(|bureau_ex| {
 			bureau_ex.inner.user_list.len() < bureau_ex.inner.options.max_players as usize
 		}) {
-			return Some(bureau_ex.inner.port);
+			return Some(bureau_ex.inner.port());
 		}
 
 		if self.bureaus.len() < self.max {
 			let bureau = Bureau::new(Self::BIND_ADDR, self.bureau_options).ok()?;
-			let port = bureau.port;
+			let port = bureau.port();
 
 			self.bureaus.push(BureauEx {
 				start_time: Instant::now(),

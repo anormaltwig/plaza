@@ -19,10 +19,10 @@ pub struct BureauOptions {
 }
 
 pub struct Bureau {
-	pub port: u16,
 	pub user_list: UserList,
 	pub options: BureauOptions,
 
+	port: u16,
 	listener: TcpListener,
 	connecting: Vec<(Instant, Option<TcpStream>)>,
 }
@@ -32,16 +32,18 @@ impl Bureau {
 		let listener = TcpListener::bind(addr)?;
 		listener.set_nonblocking(true)?;
 
-		let port = listener.local_addr()?.port();
-
 		Ok(Self {
-			port,
 			user_list: UserList::new(options.max_players),
-
-			listener,
 			options,
+
+			port: listener.local_addr()?.port(),
+			listener,
 			connecting: Vec::new(),
 		})
+	}
+
+	pub fn port(&self) -> u16 {
+		self.port
 	}
 
 	pub fn poll(&mut self) {

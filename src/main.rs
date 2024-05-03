@@ -77,6 +77,6 @@ fn main() {
 		}
 	};
 
-	println!("Bureau running on port: {}.", bureau.port);
+	println!("Bureau running on port: {}.", bureau.port());
 	bureau.run();
 }
