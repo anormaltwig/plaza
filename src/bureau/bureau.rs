@@ -46,6 +46,13 @@ impl Bureau {
 		self.port
 	}
 
+	pub fn run(&mut self) -> ! {
+		loop {
+			self.poll();
+			thread::sleep(Duration::from_millis(100));
+		}
+	}
+
 	pub fn poll(&mut self) {
 		if let Ok((socket, _)) = self.listener.accept() {
 			if let Ok(()) = socket.set_nonblocking(true) {
@@ -87,35 +94,18 @@ impl Bureau {
 			}
 		}
 
-		self.connecting.retain_mut(|(_, socket)| socket.is_some());
+		self.connecting.retain(|(_, socket)| socket.is_some());
 
 		for id in self.user_list.keys().copied().collect::<Vec<i32>>() {
 			let user = self.user_list.get_mut(&id).unwrap();
 
-			let Some(event) = user.poll() else {
-				if !user.connected {
-					self.disconnect_user(id);
-				}
-				continue;
-			};
+			if let Some(event) = user.poll() {
+				self.handle_event(id, event);
+			}
 
-			match event {
-				UserEvent::NewUser => self.new_user(),
-				UserEvent::StateChange => (),
-				UserEvent::PositionUpdate(pos) => self.position_update(id, pos),
-				UserEvent::TransformUpdate(b) => {
-					let (mat, pos) = *b;
-					self.transform_update(id, mat, pos)
-				}
-				UserEvent::ChatSend(msg) => self.chat_send(id, msg),
-				UserEvent::CharacterUpdate(data) => self.character_update(id, data),
-				UserEvent::NameChange(name) => self.name_change(id, name),
-				UserEvent::AvatarChange(avatar) => self.avatar_change(id, avatar),
-				UserEvent::PrivateChat(receiver, msg) => self.private_chat(id, receiver, msg),
-				UserEvent::ApplSpecific(b) => {
-					let (strategy, id2, method, strarg, intarg) = *b;
-					self.appl_specific(id, strategy, id2, method, strarg, intarg)
-				}
+			let user = self.user_list.get(&id).unwrap();
+			if !user.connected {
+				self.disconnect_user(id);
 			}
 		}
 
@@ -128,13 +118,6 @@ impl Bureau {
 
 		if removed {
 			self.user_list.send_user_count();
-		}
-	}
-
-	pub fn run(&mut self) -> ! {
-		loop {
-			self.poll();
-			thread::sleep(Duration::from_millis(100));
 		}
 	}
 
@@ -232,12 +215,36 @@ impl Bureau {
 	}
 
 	fn disconnect_user(&mut self, id: i32) {
-		self.send_to_aura(id, &ByteWriter::general_message(
+		self.send_to_aura(
 			id,
-			id,
-			Opcode::SMsgUserLeft,
-			&ByteWriter::new(4).write_i32(id).bytes,
-		));
+			&ByteWriter::general_message(
+				id,
+				id,
+				Opcode::SMsgUserLeft,
+				&ByteWriter::new(4).write_i32(id).bytes,
+			),
+		);
+	}
+
+	fn handle_event(&mut self, id: i32, event: UserEvent) {
+		match event {
+			UserEvent::NewUser => self.new_user(),
+			UserEvent::StateChange => (),
+			UserEvent::PositionUpdate(pos) => self.position_update(id, pos),
+			UserEvent::TransformUpdate(b) => {
+				let (mat, pos) = *b;
+				self.transform_update(id, mat, pos)
+			}
+			UserEvent::ChatSend(msg) => self.chat_send(id, msg),
+			UserEvent::CharacterUpdate(data) => self.character_update(id, data),
+			UserEvent::NameChange(name) => self.name_change(id, name),
+			UserEvent::AvatarChange(avatar) => self.avatar_change(id, avatar),
+			UserEvent::PrivateChat(receiver, msg) => self.private_chat(id, receiver, msg),
+			UserEvent::ApplSpecific(b) => {
+				let (strategy, id2, method, strarg, intarg) = *b;
+				self.appl_specific(id, strategy, id2, method, strarg, intarg)
+			}
+		}
 	}
 
 	fn new_user(&mut self) {

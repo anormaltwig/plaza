@@ -8,9 +8,8 @@ See VSCP.md for more details!
 
 # ToDo
 
-- [x] Basic bureau implementation.
-- [x] Fully implement ApplSpecific. (Probably correct.)
+- [x] Bureau implementation.
+- [x] WLS implementation.
 - [ ] Logging system.
-- [x] Lua API (likely mlua or custom bindings).
-- [x] WLS Implementation.
+- [ ] Lua API.
 

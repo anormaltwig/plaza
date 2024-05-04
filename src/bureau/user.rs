@@ -293,24 +293,21 @@ impl User {
 
 	fn character_update(&mut self, content: &[u8]) -> Option<UserEvent> {
 		let character_data = content.read_string(0);
-
-		self.data = character_data.clone();
+		self.data.clone_from(&character_data);
 
 		Some(UserEvent::CharacterUpdate(character_data))
 	}
 
 	fn name_change(&mut self, content: &[u8]) -> Option<UserEvent> {
 		let name = content.read_string(0);
-
-		self.username = name.clone();
+		self.username.clone_from(&name);
 
 		Some(UserEvent::NameChange(name))
 	}
 
 	fn avatar_change(&mut self, content: &[u8]) -> Option<UserEvent> {
 		let avatar = content.read_string(0);
-
-		self.avatar = avatar.clone();
+		self.avatar.clone_from(&avatar);
 
 		Some(UserEvent::AvatarChange(avatar))
 	}

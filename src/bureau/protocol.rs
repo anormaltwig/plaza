@@ -59,9 +59,7 @@ pub trait ByteReader {
 	fn read_string(&self, start: usize) -> String;
 	fn read_f32(&self, start: usize) -> f32;
 	fn read_u32(&self, start: usize) -> u32;
-	fn read_u8(&self, start: usize) -> u8;
 	fn read_i32(&self, start: usize) -> i32;
-	fn read_i8(&self, start: usize) -> i8;
 }
 
 impl ByteReader for [u8] {
@@ -100,10 +98,6 @@ impl ByteReader for [u8] {
 		])
 	}
 
-	fn read_u8(&self, start: usize) -> u8 {
-		self[start]
-	}
-
 	fn read_i32(&self, start: usize) -> i32 {
 		i32::from_be_bytes([
 			self[start],
@@ -111,10 +105,6 @@ impl ByteReader for [u8] {
 			self[start + 2],
 			self[start + 3],
 		])
-	}
-
-	fn read_i8(&self, start: usize) -> i8 {
-		self[start] as i8
 	}
 }
 

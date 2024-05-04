@@ -20,13 +20,13 @@ pub struct WlsOptions {
 
 fn default_wrls() -> Vec<String> {
 	vec![
-		"SAPARi COAST MIL.".to_string(),
-		"SAPARi DOWNTOWN MIL.".to_string(),
-		"HONJO JIDAIMURA MIL.".to_string(),
-		"SAPARi PARK MIL.".to_string(),
-		"SAPARi SPA".to_string(),
-		"SAPARi GARDEN".to_string(),
-		"SAPARi HILLS".to_string(),
+		"SAPARi COAST MIL.".into(),
+		"SAPARi DOWNTOWN MIL.".into(),
+		"HONJO JIDAIMURA MIL.".into(),
+		"SAPARi PARK MIL.".into(),
+		"SAPARi SPA".into(),
+		"SAPARi GARDEN".into(),
+		"SAPARi HILLS".into(),
 	]
 }
 
@@ -62,7 +62,7 @@ pub fn run(addr: SocketAddr, options: WlsOptions) -> io::Result<()> {
 		}
 
 		queue.retain_mut(|(connect_time, socket)| {
-			let mut buf: [u8; 256] = [0; 256];
+			let mut buf = [0; 256];
 			let n = match socket.read(&mut buf) {
 				Ok(n) => n,
 				Err(e) if e.kind() == ErrorKind::WouldBlock => {
@@ -88,7 +88,6 @@ pub fn run(addr: SocketAddr, options: WlsOptions) -> io::Result<()> {
 			let Some(wrl) = split.next() else {
 				return false;
 			};
-
 
 			let Some(port) = (match managers.get_mut(wrl) {
 				Some(manager) => manager.available(),

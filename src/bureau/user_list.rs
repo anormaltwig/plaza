@@ -72,7 +72,7 @@ impl UserList {
 	}
 
 	pub fn master(&mut self) -> Option<i32> {
-		if self.users.get(&self.master_index).is_some() {
+		if self.users.contains_key(&self.master_index) {
 			return Some(self.master_index);
 		}
 
