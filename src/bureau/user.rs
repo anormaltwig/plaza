@@ -89,6 +89,7 @@ impl User {
 		&self.rotation
 	}
 
+	/// Send all data within a ByteWriter to the socket this User contains.
 	pub fn send(&mut self, stream: &ByteWriter) {
 		if self.socket.write_all(&stream.bytes).is_err() {
 			self.connected = false;
@@ -113,6 +114,7 @@ impl User {
 		}
 	}
 
+	/// Poll a single event from this User.
 	pub fn poll(&mut self) -> Option<UserEvent> {
 		// Init with u8::MAX so if the read pulls 0 bytes
 		// the buffer should be unchanged and the match
@@ -283,7 +285,7 @@ impl User {
 		let text = content.read_string(0);
 
 		// Don't send empty messages.
-		let (_name, message) = text.split_once(": ")?;
+		let (_, message) = text.split_once(": ")?;
 		if message.is_empty() {
 			return None;
 		}

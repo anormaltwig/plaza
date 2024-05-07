@@ -1,5 +1,7 @@
 use super::math::Vector3;
 
+// Documentation of types listed here should be found in VSCP.md.
+
 #[repr(u32)]
 pub enum Opcode {
 	// CMsgNewUser = 0,

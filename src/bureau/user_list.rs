@@ -52,6 +52,8 @@ impl UserList {
 		None
 	}
 
+	/// Attempt to create a User from a TcpStream and add it to the list.
+	/// Returns false if a User cannot be created.
 	pub fn add(&mut self, mut socket: TcpStream) -> bool {
 		let Some(id) = self.next_id() else {
 			return false;
@@ -71,6 +73,7 @@ impl UserList {
 		true
 	}
 
+	/// Get the id of the User currently assigned the role of master.
 	pub fn master(&mut self) -> Option<i32> {
 		if self.users.contains_key(&self.master_index) {
 			return Some(self.master_index);
@@ -92,22 +95,36 @@ impl UserList {
 		None
 	}
 
-	pub fn for_others<F>(&mut self, id: &i32, f: F)
+	/// Iterate over all Users in the UserList while keeping a mutable reference to `id`.
+	pub fn for_others<F>(&mut self, id: i32, f: F)
 	where
 		F: Fn(&mut User, &mut User),
 	{
-		let user_raw = self.users.get_mut(id).unwrap() as *mut User;
+		let mut user = self.users.remove(&id).unwrap();
 		for (_, other) in self.users.iter_mut() {
-			if other as *mut User == user_raw {
-				continue;
-			}
-
-			unsafe {
-				f(&mut *user_raw, other);
-			}
+			f(&mut user, other);
 		}
+		self.users.insert(id, user);
 	}
 
+	/// Iterate over all Users in the aura of `id` while keeping an immutable reference to `id`.
+	pub fn for_aura<F>(&mut self, id: i32, f: F)
+	where
+		F: Fn(&User, &mut User),
+	{
+		let user = self.users.remove(&id).unwrap();
+		for other_id in user.aura.iter() {
+			let Some(other) = self.users.get_mut(other_id) else {
+				eprintln!("Aura desync, {} has id {}.", id, other_id);
+				continue;
+			};
+
+			f(&user, other);
+		}
+		self.users.insert(id, user);
+	}
+
+	/// Broadcast the current number of connected Users to all Users.
 	pub fn send_user_count(&mut self) {
 		let count = self.len();
 		for (_, user) in self.iter_mut() {

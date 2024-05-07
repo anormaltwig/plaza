@@ -8,7 +8,7 @@ use std::{
 use super::{
 	math::{Mat3, Vector3},
 	protocol::{ByteWriter, MsgCommon, Opcode, Strategy},
-	user::{User, UserEvent},
+	user::UserEvent,
 	user_list::UserList,
 };
 
@@ -60,41 +60,38 @@ impl Bureau {
 			}
 		}
 
-		for (connect_time, socket) in &mut self.connecting {
+		self.connecting.retain_mut(|(connect_time, socket)| {
 			let mut hello_buf = [0; 7];
 			let n = match socket.as_mut().unwrap().read(&mut hello_buf) {
 				Ok(n) => n,
 				Err(e) if e.kind() == ErrorKind::WouldBlock => {
 					if connect_time.elapsed().as_secs() > 10 {
-						socket.take();
+						return false;
 					}
-					continue;
+					return true;
 				}
-				Err(_) => {
-					socket.take();
-					continue;
-				}
+				Err(_) => return false,
 			};
 
 			let socket = socket.take().unwrap();
 
 			if n < 7 {
-				continue;
+				return false;
 			}
 
 			for (i, b) in hello_buf.iter().enumerate() {
 				// Last two bytes are vscp version.
 				if *b != b"hello\x01\x01"[i] {
-					continue;
+					return false;
 				}
 			}
 
 			if self.user_list.add(socket) {
 				self.user_list.send_user_count();
 			}
-		}
 
-		self.connecting.retain(|(_, socket)| socket.is_some());
+			false
+		});
 
 		for id in self.user_list.keys().copied().collect::<Vec<i32>>() {
 			let user = self.user_list.get_mut(&id).unwrap();
@@ -121,21 +118,6 @@ impl Bureau {
 		}
 	}
 
-	fn send_to_aura(&mut self, id: i32, stream: &ByteWriter) {
-		let sender = self.user_list.get(&id).unwrap() as *const User;
-		unsafe {
-			for id in &(*sender).aura {
-				let other = match self.user_list.get_mut(id) {
-					Some(user) => user as *mut User,
-					None => continue,
-				};
-				assert_ne!(sender, other, "Tried to borrow the same user twice.");
-
-				(*other).send(stream);
-			}
-		}
-	}
-
 	fn send_to_all(&mut self, stream: &ByteWriter) {
 		for (_, user) in self.user_list.iter_mut() {
 			user.send(stream);
@@ -143,12 +125,18 @@ impl Bureau {
 	}
 
 	fn send_to_other(&mut self, id: i32, stream: &ByteWriter) {
-		self.user_list.for_others(&id, |_, other| {
+		self.user_list.for_others(id, |_, other| {
 			other.send(stream);
 		});
 	}
 
-	fn update_aura(&mut self, id: &i32) {
+	fn send_to_aura(&mut self, id: i32, stream: &ByteWriter) {
+		self.user_list.for_aura(id, |_, other| {
+			other.send(stream);
+		});
+	}
+
+	fn update_aura(&mut self, id: i32) {
 		self.user_list.for_others(id, |user, other| {
 			let in_radius =
 				user.pos().distance_sqr(other.pos()) <= self.options.aura_radius.powi(2);
@@ -215,15 +203,15 @@ impl Bureau {
 	}
 
 	fn disconnect_user(&mut self, id: i32) {
-		self.send_to_aura(
-			id,
-			&ByteWriter::general_message(
+		self.user_list.for_aura(id, |_, other| {
+			other.aura.remove(&id);
+			other.send(&ByteWriter::general_message(
 				id,
 				id,
 				Opcode::SMsgUserLeft,
 				&ByteWriter::new(4).write_i32(id).bytes,
-			),
-		);
+			))
+		})
 	}
 
 	fn handle_event(&mut self, id: i32, event: UserEvent) {
@@ -253,13 +241,12 @@ impl Bureau {
 	}
 
 	fn position_update(&mut self, id: i32, pos: Vector3) {
-		self.update_aura(&id);
-
+		self.update_aura(id);
 		self.send_to_aura(id, &ByteWriter::position_update(id, &pos))
 	}
 
 	fn transform_update(&mut self, id: i32, rot: Mat3, pos: Vector3) {
-		self.update_aura(&id);
+		self.update_aura(id);
 
 		let mut transform_update = ByteWriter::new(12 * 4);
 
@@ -287,7 +274,7 @@ impl Bureau {
 	fn chat_send(&mut self, id: i32, msg: String) {
 		let text = format!("{}: {}", self.user_list.get(&id).unwrap().username, msg);
 
-		self.send_to_other(
+		self.send_to_aura(
 			id,
 			&ByteWriter::message_common(
 				id,
@@ -362,9 +349,8 @@ impl Bureau {
 			text = format!("{}: {}", user.username, msg).to_string();
 		}
 
-		let other = match self.user_list.get_mut(&receiver) {
-			Some(u) => u,
-			None => return,
+		let Some(other) = self.user_list.get_mut(&receiver) else {
+			return;
 		};
 
 		other.send(&ByteWriter::message_common(
