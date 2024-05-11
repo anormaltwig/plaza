@@ -10,6 +10,6 @@ See VSCP.md for more details!
 
 - [x] Bureau implementation.
 - [x] WLS implementation.
+- [x] Lua API.
 - [ ] Logging system.
-- [ ] Lua API.
 

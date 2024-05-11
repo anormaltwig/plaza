@@ -58,6 +58,14 @@ function basis:setScale(v)
 	self[9] = self[9] / s[3] * v[3]
 end
 
+--- Clones the basis.
+---@return Basis
+function basis:clone()
+	local rot = Basis()
+	rot:set(self)
+	return rot
+end
+
 --- Create a new basis.
 ---@return Basis
 function Basis()

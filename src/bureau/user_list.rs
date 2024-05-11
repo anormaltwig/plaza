@@ -67,7 +67,9 @@ impl UserList {
 			}
 		}
 
-		let user = User::new(id, socket);
+		let Ok(user) = User::new(id, socket) else {
+			return false;
+		};
 		self.insert(id, user);
 
 		true

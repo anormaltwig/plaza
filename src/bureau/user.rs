@@ -1,7 +1,7 @@
 use std::{
 	collections::HashSet,
-	io::{ErrorKind, Read, Write},
-	net::TcpStream,
+	io::{self, ErrorKind, Read, Write},
+	net::{SocketAddr, TcpStream},
 };
 
 use super::{
@@ -10,16 +10,16 @@ use super::{
 };
 
 pub enum UserEvent {
-	NewUser,
+	NewUser(String, String),
 	StateChange,
 	PositionUpdate(Vector3),
-	TransformUpdate(Box<(Mat3, Vector3)>),
+	TransformUpdate(Mat3, Vector3),
 	ChatSend(String),
 	CharacterUpdate(String),
 	NameChange(String),
 	AvatarChange(String),
 	PrivateChat(i32, String),
-	ApplSpecific(Box<(Strategy, i32, String, String, i32)>),
+	ApplSpecific(Strategy, i32, String, String, i32),
 }
 
 pub struct User {
@@ -30,15 +30,15 @@ pub struct User {
 	pub avatar: String,
 	pub data: String,
 
+	addr: SocketAddr,
 	socket: TcpStream,
 	position: Vector3,
 	rotation: Mat3,
 }
 
-#[allow(dead_code)]
 impl User {
-	pub fn new(id: i32, socket: TcpStream) -> Self {
-		Self {
+	pub fn new(id: i32, socket: TcpStream) -> io::Result<Self> {
+		Ok(Self {
 			id,
 			aura: HashSet::new(),
 			connected: true,
@@ -46,10 +46,16 @@ impl User {
 			avatar: String::new(),
 			data: String::new(),
 
+			addr: socket.peer_addr()?,
 			socket,
 			position: Vector3::new(0.0, 0.0, 0.0),
 			rotation: Mat3::new(),
-		}
+		})
+	}
+
+	/// Get user SocketAddr.
+	pub fn addr(&self) -> &SocketAddr {
+		&self.addr
 	}
 
 	/// Set user position.
@@ -83,10 +89,6 @@ impl User {
 			&transform_update.bytes,
 		));
 		self.rotation = rot;
-	}
-	/// Get user rotation.
-	pub fn rot(&self) -> &Mat3 {
-		&self.rotation
 	}
 
 	/// Send all data within a ByteWriter to the socket this User contains.
@@ -194,8 +196,8 @@ impl User {
 
 		let avatar = packet.read_string(username.len() + 1);
 
-		self.username = username;
-		self.avatar = avatar;
+		self.username.clone_from(&username);
+		self.avatar.clone_from(&avatar);
 
 		self.send(&ByteWriter::general_message(
 			0,
@@ -223,7 +225,7 @@ impl User {
 			&self.id.to_be_bytes(),
 		));
 
-		Some(UserEvent::NewUser)
+		Some(UserEvent::NewUser(username, avatar))
 	}
 
 	fn msg_common(&mut self, packet: &[u8]) -> Option<UserEvent> {
@@ -275,10 +277,10 @@ impl User {
 			content.read_f32(44),
 		);
 
-		Some(UserEvent::TransformUpdate(Box::new((
+		Some(UserEvent::TransformUpdate(
 			self.rotation.clone(),
 			self.position.clone(),
-		))))
+		))
 	}
 
 	fn chat_send(&self, content: &[u8]) -> Option<UserEvent> {
@@ -341,12 +343,12 @@ impl User {
 
 		let intarg = content.read_i32(method.len() + strarg.len() + 3);
 
-		Some(UserEvent::ApplSpecific(Box::new((
+		Some(UserEvent::ApplSpecific(
 			strategy.into(),
 			id,
 			method,
 			strarg,
 			intarg,
-		))))
+		))
 	}
 }

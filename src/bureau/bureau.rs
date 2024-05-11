@@ -1,11 +1,12 @@
 use std::{
-	io::{self, ErrorKind, Read},
+	io::{ErrorKind, Read},
 	net::{SocketAddr, TcpListener, TcpStream},
 	thread,
 	time::{Duration, Instant},
 };
 
 use super::{
+	lua_api::LuaApi,
 	math::{Mat3, Vector3},
 	protocol::{ByteWriter, MsgCommon, Opcode, Strategy},
 	user::UserEvent,
@@ -25,12 +26,15 @@ pub struct Bureau {
 	port: u16,
 	listener: TcpListener,
 	connecting: Vec<(Instant, Option<TcpStream>)>,
+	lua_api: LuaApi,
 }
 
 impl Bureau {
-	pub fn new(addr: SocketAddr, options: BureauOptions) -> io::Result<Self> {
+	pub fn new(addr: SocketAddr, options: BureauOptions) -> anyhow::Result<Self> {
 		let listener = TcpListener::bind(addr)?;
 		listener.set_nonblocking(true)?;
+
+		let lua_api = LuaApi::new()?;
 
 		Ok(Self {
 			user_list: UserList::new(options.max_players),
@@ -39,6 +43,7 @@ impl Bureau {
 			port: listener.local_addr()?.port(),
 			listener,
 			connecting: Vec::new(),
+			lua_api,
 		})
 	}
 
@@ -54,11 +59,15 @@ impl Bureau {
 	}
 
 	pub fn poll(&mut self) {
-		if let Ok((socket, _)) = self.listener.accept() {
-			if let Ok(()) = socket.set_nonblocking(true) {
-				self.connecting.push((Instant::now(), Some(socket)));
+		if let Ok((socket, addr)) = self.listener.accept() {
+			if self.lua_api.user_connect(addr) {
+				if let Ok(()) = socket.set_nonblocking(true) {
+					self.connecting.push((Instant::now(), Some(socket)));
+				}
 			}
 		}
+
+		self.lua_api.think();
 
 		self.connecting.retain_mut(|(connect_time, socket)| {
 			let mut hello_buf = [0; 7];
@@ -93,13 +102,18 @@ impl Bureau {
 			false
 		});
 
-		for id in self.user_list.keys().copied().collect::<Vec<i32>>() {
-			let user = self.user_list.get_mut(&id).unwrap();
+		let keys = self.user_list.keys().copied().collect::<Vec<i32>>();
+		for id in &keys {
+			let user = self.user_list.get_mut(id).unwrap();
 
 			if let Some(event) = user.poll() {
-				self.handle_event(id, event);
+				self.handle_event(*id, event);
 			}
+		}
 
+		self.lua_api.run_events(&mut self.user_list);
+
+		for id in keys {
 			let user = self.user_list.get(&id).unwrap();
 			if !user.connected {
 				self.disconnect_user(id);
@@ -107,12 +121,10 @@ impl Bureau {
 		}
 
 		let mut removed = false;
-
 		self.user_list.retain(|_, user| {
 			removed |= !user.connected;
 			user.connected
 		});
-
 		if removed {
 			self.user_list.send_user_count();
 		}
@@ -158,6 +170,8 @@ impl Bureau {
 					Opcode::SMsgUserLeft,
 					&ByteWriter::new(4).write_i32(other.id).bytes,
 				));
+
+				self.lua_api.aura_leave(user.id, other.id);
 			} else if in_radius && !in_aura {
 				other.aura.insert(user.id);
 				other.send(&ByteWriter::general_message(
@@ -198,6 +212,8 @@ impl Bureau {
 					Strategy::AuraClientsExceptSender,
 					&ByteWriter::new(0).write_string(&other.data).bytes,
 				));
+
+				self.lua_api.aura_enter(user.id, other.id);
 			}
 		});
 	}
@@ -211,38 +227,41 @@ impl Bureau {
 				Opcode::SMsgUserLeft,
 				&ByteWriter::new(4).write_i32(id).bytes,
 			))
-		})
+		});
+
+		self.lua_api.user_disconnect(id);
 	}
 
 	fn handle_event(&mut self, id: i32, event: UserEvent) {
 		match event {
-			UserEvent::NewUser => self.new_user(),
+			UserEvent::NewUser(name, avatar) => self.new_user(id, name, avatar),
 			UserEvent::StateChange => (),
 			UserEvent::PositionUpdate(pos) => self.position_update(id, pos),
-			UserEvent::TransformUpdate(b) => {
-				let (mat, pos) = *b;
-				self.transform_update(id, mat, pos)
-			}
+			UserEvent::TransformUpdate(mat, pos) => self.transform_update(id, mat, pos),
 			UserEvent::ChatSend(msg) => self.chat_send(id, msg),
 			UserEvent::CharacterUpdate(data) => self.character_update(id, data),
 			UserEvent::NameChange(name) => self.name_change(id, name),
 			UserEvent::AvatarChange(avatar) => self.avatar_change(id, avatar),
 			UserEvent::PrivateChat(receiver, msg) => self.private_chat(id, receiver, msg),
-			UserEvent::ApplSpecific(b) => {
-				let (strategy, id2, method, strarg, intarg) = *b;
+			UserEvent::ApplSpecific(strategy, id2, method, strarg, intarg) => {
 				self.appl_specific(id, strategy, id2, method, strarg, intarg)
 			}
 		}
 	}
 
-	fn new_user(&mut self) {
+	fn new_user(&mut self, id: i32, name: String, avatar: String) {
 		self.user_list.master();
 		self.user_list.send_user_count();
+
+		let ip = self.user_list.get(&id).unwrap().addr().ip();
+		self.lua_api.new_user(id, &name, &avatar, ip);
 	}
 
 	fn position_update(&mut self, id: i32, pos: Vector3) {
 		self.update_aura(id);
-		self.send_to_aura(id, &ByteWriter::position_update(id, &pos))
+		self.send_to_aura(id, &ByteWriter::position_update(id, &pos));
+
+		self.lua_api.pos_update(id, &pos);
 	}
 
 	fn transform_update(&mut self, id: i32, rot: Mat3, pos: Vector3) {
@@ -268,10 +287,20 @@ impl Bureau {
 				Strategy::AuraClients,
 				&transform_update.bytes,
 			),
-		)
+		);
+
+		self.lua_api.trans_update(id, &rot);
 	}
 
-	fn chat_send(&mut self, id: i32, msg: String) {
+	fn chat_send(&mut self, id: i32, mut msg: String) {
+		if let Some(new_msg) = self.lua_api.chat_send(id, &msg) {
+			if new_msg.is_empty() {
+				return;
+			}
+
+			msg = new_msg;
+		}
+
 		let text = format!("{}: {}", self.user_list.get(&id).unwrap().username, msg);
 
 		self.send_to_aura(
@@ -310,6 +339,8 @@ impl Bureau {
 				&ByteWriter::new(name.len() + 1).write_string(&name).bytes,
 			),
 		);
+
+		self.lua_api.name_change(id, &name);
 	}
 
 	fn avatar_change(&mut self, id: i32, avatar: String) {
@@ -325,11 +356,11 @@ impl Bureau {
 					.bytes,
 			),
 		);
+
+		self.lua_api.avatar_change(id, &avatar);
 	}
 
 	fn private_chat(&mut self, id: i32, receiver: i32, mut text: String) {
-		let user = self.user_list.get(&id).unwrap();
-
 		let is_special = matches!(
 			text.as_str(),
 			"%%REQ" | "%%RINGING" | "%%REJECT" | "%%ACCEPT" | "%%OK" | "%%BUSY" | "%%END"
@@ -341,12 +372,15 @@ impl Bureau {
 					if message.is_empty() {
 						return;
 					}
-					message
+
+					self.lua_api
+						.private_chat(id, receiver, message)
+						.unwrap_or(message.to_string())
 				}
 				None => return,
 			};
 
-			text = format!("{}: {}", user.username, msg).to_string();
+			text = format!("{}: {}", self.user_list.get(&id).unwrap().username, msg).to_string();
 		}
 
 		let Some(other) = self.user_list.get_mut(&receiver) else {
