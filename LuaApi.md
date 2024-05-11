@@ -21,7 +21,7 @@ Run a hook. Useful for letting other plugins know when something happens.
 | Name | Args | Desc |
 | --- | --- | --- |
 | Think | | Called every time the bureau polls users. |
-| UserConnecting | addr: string | Called when a client first connects, passes socket address. |
+| UserConnect | addr: string | Called when a client first connects, passes socket address. |
 | NewUser | user: User, name: string, avatar: string | Called when a user fully connects to the bureau. |
 | PositionUpdate | user: User, pos: Vector | Called when a user sends their position |
 | TransformUpdate | user: User | Called when a user sends their transform |
@@ -90,6 +90,10 @@ Create a new vector with the same direction but a length of 1.
 
 Modify the vector so that its length is 1.
 
+`Vector:clone() -> Vector`
+
+Clone vector.
+
 `Vector(x: number, y: number, z: number) -> Vector`
 
 Create a new vector, you can get x, y, and z components by indexing 1, 2, and 3 respectively.
@@ -115,6 +119,10 @@ Gets scale of the basis.
 `Basis:setScale(v)`
 
 Sets the scale of the basis.
+
+`Basis:clone() -> Basis`
+
+Clones the basis.
 
 `Basis()`
 
