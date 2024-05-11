@@ -73,6 +73,11 @@ function vec:normalize()
 	self[3] = self[3] / len
 end
 
+--- Clone vector.
+function vec:clone()
+	return Vector(self[1], self[2], self[3])
+end
+
 --- Create a new vector, you can get x, y, and z components by indexing 1, 2, and 3 respectively.
 ---@param x number
 ---@param y number

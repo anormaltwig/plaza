@@ -18,18 +18,22 @@ impl Vector3 {
 		self.z = z;
 	}
 
+	/// Get squared length of the Vector3, faster than regular length.
 	pub fn length_sqr(&self) -> f32 {
 		self.x.powi(2) + self.y.powi(2) + self.z.powi(2)
 	}
 
+	/// Get length of the Vector3.
 	pub fn length(&self) -> f32 {
 		self.length_sqr().sqrt()
 	}
 
+	/// Get the squared distance between two Vector3s, faster than regular distance.
 	pub fn distance_sqr(&self, other: &Self) -> f32 {
 		(other - self).length_sqr()
 	}
 
+	/// Get the distance between two Vector3s
 	pub fn distance(&self, other: &Self) -> f32 {
 		(other - self).length()
 	}

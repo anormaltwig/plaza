@@ -29,8 +29,6 @@ Packets will be displayed in the following format
 | string | Sequence of characters termitated by null |
 | data | Arbitrary or unknown data |
 
-### Notes
-
 - All numbers are in Big Endian order.
 
 ## Initial Connection
@@ -87,8 +85,6 @@ Every packet starts with a uint8 defining what type of packet it is followed imm
 | Name | Bytes | Type | Description |
 | --- | --- | --- | --- |
 | ??? | 14 | data | |
-
-#### Notes
 
 - General Message and Position Update are also internally called 'Sys0 Message' and 'Sys2 Message' respectively by the original bureau, but were renamed since they are both nicer names, and because they were named that way before I started looking through decompiled code.
 
@@ -151,8 +147,6 @@ Every packet starts with a uint8 defining what type of packet it is followed imm
 | Avatar | ~ | string | |
 | Username | ~ | string | |
 
-#### Notes
-
 - Every time a user receives the SMsgUserJoined for when they joined, a new timer for networking their position and rotation starts. You can technically get them to send their position as fast as you want with this for smother movement and rotation if you can time it right.
 
 ### SMsgUserLeft
@@ -197,8 +191,6 @@ Every packet starts with a uint8 defining what type of packet it is followed imm
 | --- | --- | --- | --- |
 | IsMaster | 1 | uint8 | Set to 1 when they are the master, 0 when they arn't. |
 
-#### Notes
-
 - Pretty much determintes whether the amIMaster vscp api function returns true or false.
 
 ### SMsgUserCount
@@ -235,8 +227,6 @@ Every packet starts with a uint8 defining what type of packet it is followed imm
 | 5 | Unused/Unknown |
 | 6 | Unused/Unknown |
 
-### Notes
-
 - In the original bureau, most message common types have a strategy value they expect, but only log a warning and keep going if its wrong.
 
 - ApplSpecific seems to get called for any unused type value in the original bureau.
@@ -254,8 +244,6 @@ Every packet starts with a uint8 defining what type of packet it is followed imm
 | Y | 4 | int32float |
 | Z | 4 | int32float |
 
-#### Notes
-
 - TransformUpdate is a 4x3 matrix where the first 9 values make up the rotation matrix and the last three are a position offset.
 
 ### ChatSend
@@ -269,8 +257,6 @@ Every packet starts with a uint8 defining what type of packet it is followed imm
 | Name | Bytes | Type |
 | --- | --- | --- |
 | Data | ~ | string |
-
-#### Notes
 
 - The data will look something like `sleep:0 1:000000000000:58:0:`.
 
@@ -314,8 +300,6 @@ Every packet starts with a uint8 defining what type of packet it is followed imm
 | %%BUSY | Tell requesting user that they are already in a private chat. |
 | %%SILENT | ??? Exists in code but doesn't seem to be sent anywhere. Any user receiving it results in 'Cannot Connect' being printed to their private chat window. |
 
-#### Notes
-
 - The id in the MsgCommon header is the id of the user the message is to be sent to.
 
 ### ApplSpecific
@@ -326,8 +310,6 @@ Every packet starts with a uint8 defining what type of packet it is followed imm
 | Method | ~ | string | |
 | StrArg | ~ | string | |
 | IntArg | 4 | int32 | Usually set to the sender's Broadcast Id |
-
-#### Notes
 
 - This is the worst thing ever to decode.
 
