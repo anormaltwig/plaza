@@ -28,7 +28,7 @@ function user_meta:disconnect()
 	return disconnect(self.id)
 end
 
---- Get socket address of the user.
+--- Get the IP address of the user.
 ---@return string
 function user_meta:getIp()
 	return self._ip

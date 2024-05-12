@@ -185,7 +185,12 @@ impl LuaApi {
 	}
 
 	pub fn run_events(&mut self, user_list: &mut UserList) {
-		for (id, event) in self.event_queue.borrow_mut().drain(..) {
+		let mut event_queue = self.event_queue.borrow_mut();
+		if event_queue.is_empty() {
+			return;
+		}
+
+		for (id, event) in event_queue.drain(..) {
 			let Some(user) = user_list.get_mut(&id) else {
 				continue;
 			};
@@ -204,6 +209,8 @@ impl LuaApi {
 				LuaEvent::Disconnect => user.connected = false,
 			}
 		}
+
+		event_queue.shrink_to_fit();
 	}
 
 	fn call<A, R>(&self, rk: &RegistryKey, args: A) -> Option<R>

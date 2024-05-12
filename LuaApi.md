@@ -38,9 +38,9 @@ Run a hook. Useful for letting other plugins know when something happens.
 
 Disconnect the user from the bureau.
 
-`User:getPeerAddr() -> string`
+`User:getIp() -> string`
 
-Get socket address of the user.
+Get the IP address of the user.
 
 `User:setPos(pos: Vector)`
 
