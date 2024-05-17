@@ -59,7 +59,7 @@ impl UserList {
 			return false;
 		};
 
-		let buf = [&b"hello\0"[..], &id.to_be_bytes(), &id.to_be_bytes()].concat();
+		let buf = [b"hello\0".as_ref(), &id.to_be_bytes(), &id.to_be_bytes()].concat();
 
 		if let Ok(n) = socket.write(&buf) {
 			if n != buf.len() {

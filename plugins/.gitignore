@@ -1,4 +1,0 @@
-# Ignore everything in this directory except the gitignore.
-# This folder is for external plugins.
-*
-!.gitignore

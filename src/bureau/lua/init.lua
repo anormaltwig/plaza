@@ -7,11 +7,7 @@ local send_packet = ftbl.send_packet
 local disconnect = ftbl.disconnect
 
 -- Add lua and plugin directories to loader path.
-package.path = "lua/?.lua;plugins/?.lua;" .. package.path
-
-require("hook")
-require("vector")
-require("basis")
+package.path = "plugins/?.lua;" .. package.path
 
 ---@class User
 ---@field id number

@@ -1,11 +1,13 @@
 use std::{
 	cell::RefCell,
-	fs, io,
+	fs,
+	io::{self, ErrorKind},
 	net::{IpAddr, SocketAddr},
 	path::PathBuf,
 	rc::Rc,
 };
 
+use branch_macro::include_lua;
 use mlua::{ChunkMode, FromLuaMulti, Function, IntoLuaMulti, Lua, RegistryKey, Table};
 
 use super::{
@@ -107,24 +109,34 @@ impl Funcs {
 			})?,
 		)?;
 
-		let fntbl = lua
-			.load(include_str!("../../lua/init.lua"))
-			.call::<_, Table>(tbl)?;
+		let to_load = [
+			include_lua!("src/bureau/lua/basis.lua").as_ref(),
+			include_lua!("src/bureau/lua/hook.lua").as_ref(),
+			include_lua!("src/bureau/lua/vector.lua").as_ref(),
+		];
+
+		for b in to_load {
+			lua.load(b).exec()?;
+		}
+
+		// Run main init file.
+		let tbl: Table = lua
+			.load(include_lua!("src/bureau/lua/init.lua").as_ref())
+			.call(tbl)?;
 
 		Ok(Self {
-			think: lua.create_registry_value::<Function>(fntbl.get("think")?)?,
-			user_connect: lua.create_registry_value::<Function>(fntbl.get("user_connect")?)?,
-			new_user: lua.create_registry_value::<Function>(fntbl.get("new_user")?)?,
-			pos_update: lua.create_registry_value::<Function>(fntbl.get("pos_update")?)?,
-			trans_update: lua.create_registry_value::<Function>(fntbl.get("trans_update")?)?,
-			chat_send: lua.create_registry_value::<Function>(fntbl.get("chat_send")?)?,
-			name_change: lua.create_registry_value::<Function>(fntbl.get("name_change")?)?,
-			avatar_change: lua.create_registry_value::<Function>(fntbl.get("avatar_change")?)?,
-			private_chat: lua.create_registry_value::<Function>(fntbl.get("private_chat")?)?,
-			aura_enter: lua.create_registry_value::<Function>(fntbl.get("aura_enter")?)?,
-			aura_leave: lua.create_registry_value::<Function>(fntbl.get("aura_leave")?)?,
-			user_disconnect: lua
-				.create_registry_value::<Function>(fntbl.get("user_disconnect")?)?,
+			think: lua.create_registry_value::<Function>(tbl.get("think")?)?,
+			user_connect: lua.create_registry_value::<Function>(tbl.get("user_connect")?)?,
+			new_user: lua.create_registry_value::<Function>(tbl.get("new_user")?)?,
+			pos_update: lua.create_registry_value::<Function>(tbl.get("pos_update")?)?,
+			trans_update: lua.create_registry_value::<Function>(tbl.get("trans_update")?)?,
+			chat_send: lua.create_registry_value::<Function>(tbl.get("chat_send")?)?,
+			name_change: lua.create_registry_value::<Function>(tbl.get("name_change")?)?,
+			avatar_change: lua.create_registry_value::<Function>(tbl.get("avatar_change")?)?,
+			private_chat: lua.create_registry_value::<Function>(tbl.get("private_chat")?)?,
+			aura_enter: lua.create_registry_value::<Function>(tbl.get("aura_enter")?)?,
+			aura_leave: lua.create_registry_value::<Function>(tbl.get("aura_leave")?)?,
+			user_disconnect: lua.create_registry_value::<Function>(tbl.get("user_disconnect")?)?,
 		})
 	}
 }
@@ -148,7 +160,19 @@ fn do_file(lua: &mut Lua, path: PathBuf) -> mlua::Result<()> {
 }
 
 fn load_plugins(lua: &mut Lua) -> io::Result<()> {
-	for file in fs::read_dir("plugins")? {
+	let read_dir = match fs::read_dir("plugins") {
+		Ok(r) => r,
+		Err(err) => {
+			if err.kind() == ErrorKind::NotFound {
+				println!("The 'plugins' directory is missing, no plugins will be loaded.");
+				return Ok(());
+			}
+
+			return Err(err);
+		}
+	};
+
+	for file in read_dir {
 		let file = file?;
 
 		if file.file_type()?.is_dir() {

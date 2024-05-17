@@ -74,10 +74,7 @@ impl Bureau {
 			let n = match socket.as_mut().unwrap().read(&mut hello_buf) {
 				Ok(n) => n,
 				Err(e) if e.kind() == ErrorKind::WouldBlock => {
-					if connect_time.elapsed().as_secs() > 10 {
-						return false;
-					}
-					return true;
+					return connect_time.elapsed().as_secs() <= 10;
 				}
 				Err(_) => return false,
 			};
@@ -103,11 +100,11 @@ impl Bureau {
 		});
 
 		let keys = self.user_list.keys().copied().collect::<Vec<i32>>();
-		for id in &keys {
-			let user = self.user_list.get_mut(id).unwrap();
+		for id in keys.iter().copied() {
+			let user = self.user_list.get_mut(&id).unwrap();
 
 			if let Some(event) = user.poll() {
-				self.handle_event(*id, event);
+				self.handle_event(id, event);
 			}
 		}
 
