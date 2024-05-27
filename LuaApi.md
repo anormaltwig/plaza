@@ -4,43 +4,37 @@ Lua api for bureau plugins.
 
 ## hook
 
-`hook.add(name: string, id: string, func: function)`
+`hook.onThink(fn: fun())`
 
-Adds a new callback for the given hook name.
+`hook.onUserConnect(fn: fun(addr: string):boolean?)`
 
-`hook.remove(name: string, id: string)`
+`hook.onNewUser(fn: fun())`
 
-Remove callback for the given hook name and id pair.
+`hook.onPositionUpdate(fn: fun(user: User, pos: Vector))`
 
-`hook.call(name: string, ...any)`
+`hook.onTransformUpdate(fn: fun(user: User))`
 
-Run a hook. Useful for letting other plugins know when something happens.
+`hook.onChatSend(fn: fun(user: User, msg: string):string?)`
 
-### Hooks
+`hook.onNameChange(fn: fun(user: User, name: string, old: string))`
 
-| Name | Args | Desc |
-| --- | --- | --- |
-| Think | | Called every time the bureau polls users. |
-| UserConnect | addr: string | Called when a client first connects, passes socket address. |
-| NewUser | user: User, name: string, avatar: string | Called when a user fully connects to the bureau. |
-| PositionUpdate | user: User, pos: Vector | Called when a user sends their position |
-| TransformUpdate | user: User | Called when a user sends their transform |
-| NameChange | user: User | Called every time someone changes their name |
-| AvatarChange | user: User | Called every time someone changes their avatar |
-| PrivateChat | user1: User, user2: User, msg: string | Called when user1 send a private chat message to user2 |
-| AuraEnter | a: User, b: User | Called when user a enters user b's aura |
-| AuraLeave | a: User, b: User | Called when user a leaves user b's aura |
-| UserDisconnect | user: User | Called when a user disconnects |
+`hook.onAvatarChange(fn: fun(user: User, avatar: string, old: string))`
+
+`hook.onPrivateChat(fn: fun(sender: User, receiver: User, msg: string):string?)`
+
+`hook.onAuraEnter(fn: fun(u1: User, u2: User))`
+
+`hook.onAuraLeave(fn: fun(u1: User, u2: User))`
+
+`hook.onUserDisconnect(fn: fun(user: User))`
+
+`hook.onPluginsLoaded(fn: fun())`
 
 ## User
 
 `User:disconnect()`
 
 Disconnect the user from the bureau.
-
-`User:getIp() -> string`
-
-Get the IP address of the user.
 
 `User:setPos(pos: Vector)`
 

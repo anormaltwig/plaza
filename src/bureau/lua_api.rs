@@ -39,6 +39,7 @@ struct Funcs {
 	aura_enter: RegistryKey,
 	aura_leave: RegistryKey,
 	user_disconnect: RegistryKey,
+	plugins_loaded: RegistryKey,
 }
 
 impl Funcs {
@@ -109,20 +110,18 @@ impl Funcs {
 			})?,
 		)?;
 
-		let to_load = [
-			include_lua!("src/bureau/lua/basis.lua").as_ref(),
-			include_lua!("src/bureau/lua/hook.lua").as_ref(),
-			include_lua!("src/bureau/lua/vector.lua").as_ref(),
-		];
+		lua.load(include_lua!("src/bureau/lua/vector.lua").as_ref())
+			.exec()?;
+		lua.load(include_lua!("src/bureau/lua/basis.lua").as_ref())
+			.exec()?;
 
-		for b in to_load {
-			lua.load(b).exec()?;
-		}
-
-		// Run main init file.
-		let tbl: Table = lua
-			.load(include_lua!("src/bureau/lua/init.lua").as_ref())
+		let (users, user_meta): (Table, Table) = lua
+			.load(include_lua!("src/bureau/lua/user.lua").as_ref())
 			.call(tbl)?;
+
+		let tbl: Table = lua
+			.load(include_lua!("src/bureau/lua/hook.lua").as_ref())
+			.call((users, user_meta))?;
 
 		Ok(Self {
 			think: lua.create_registry_value::<Function>(tbl.get("think")?)?,
@@ -137,6 +136,7 @@ impl Funcs {
 			aura_enter: lua.create_registry_value::<Function>(tbl.get("aura_enter")?)?,
 			aura_leave: lua.create_registry_value::<Function>(tbl.get("aura_leave")?)?,
 			user_disconnect: lua.create_registry_value::<Function>(tbl.get("user_disconnect")?)?,
+			plugins_loaded: lua.create_registry_value::<Function>(tbl.get("plugins_loaded")?)?,
 		})
 	}
 }
@@ -201,11 +201,15 @@ impl LuaApi {
 		let funcs = Funcs::init(&mut lua, &event_queue)?;
 		load_plugins(&mut lua)?;
 
-		Ok(Self {
+		let lua_api = Self {
 			lua,
 			funcs,
 			event_queue,
-		})
+		};
+
+		lua_api.call::<_, ()>(&lua_api.funcs.plugins_loaded, ());
+
+		Ok(lua_api)
 	}
 
 	pub fn run_events(&mut self, user_list: &mut UserList) {
