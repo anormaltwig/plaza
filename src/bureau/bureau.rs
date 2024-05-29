@@ -364,20 +364,26 @@ impl Bureau {
 		);
 
 		if !is_special {
-			let msg = match text.split_once(": ") {
-				Some((_name, message)) => {
-					if message.is_empty() {
+			let Some((_, msg)) = text.split_once(": ") else {
+				return;
+			};
+
+			if msg.is_empty() {
+				return;
+			}
+
+			let content = match self.lua_api.private_chat(id, receiver, msg) {
+				Some(new_msg) => {
+					if new_msg.is_empty() {
 						return;
 					}
 
-					self.lua_api
-						.private_chat(id, receiver, message)
-						.unwrap_or(message.to_string())
+					new_msg
 				}
-				None => return,
+				None => msg.to_string(),
 			};
 
-			text = format!("{}: {}", self.user_list.get(&id).unwrap().username, msg).to_string();
+			text = format!("{}: {}", self.user_list.get(&id).unwrap().username, content);
 		}
 
 		let Some(other) = self.user_list.get_mut(&receiver) else {
