@@ -110,17 +110,14 @@ impl Funcs {
 			})?,
 		)?;
 
-		lua.load(include_lua!("src/bureau/lua/vector.lua").as_ref())
-			.exec()?;
-		lua.load(include_lua!("src/bureau/lua/basis.lua").as_ref())
-			.exec()?;
+		lua.load(include_lua!("lua/vector.lua").as_ref()).exec()?;
+		lua.load(include_lua!("lua/basis.lua").as_ref()).exec()?;
 
-		let (users, user_meta): (Table, Table) = lua
-			.load(include_lua!("src/bureau/lua/user.lua").as_ref())
-			.call(tbl)?;
+		let (users, user_meta): (Table, Table) =
+			lua.load(include_lua!("lua/user.lua").as_ref()).call(tbl)?;
 
 		let tbl: Table = lua
-			.load(include_lua!("src/bureau/lua/hook.lua").as_ref())
+			.load(include_lua!("lua/hook.lua").as_ref())
 			.call((users, user_meta))?;
 
 		Ok(Self {

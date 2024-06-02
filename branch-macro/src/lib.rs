@@ -1,7 +1,9 @@
+#![feature(proc_macro_span)]
+
 use std::fs;
 
 use mlua::Lua;
-use proc_macro::{Literal, TokenStream, TokenTree};
+use proc_macro::{Literal, Span, TokenStream, TokenTree};
 use syn::{
 	parse::{Parse, ParseStream},
 	parse_macro_input, LitStr,
@@ -19,13 +21,21 @@ impl Parse for MacroInput {
 /// Load lua file and convert it to bytecode.
 #[proc_macro]
 pub fn include_lua(tokens: TokenStream) -> TokenStream {
-	let path = parse_macro_input!(tokens as MacroInput).0;
+	let target = parse_macro_input!(tokens as MacroInput).0;
+	let mut path = Span::call_site()
+		.source_file()
+		.path()
+		.parent()
+		.unwrap()
+		.to_path_buf();
+	path.push(target);
+
 	let file = fs::read(&path).expect("Failed to read file.");
 
 	let lua = Lua::new();
 	let data = lua
 		.load(file)
-		.set_name(&path)
+		.set_name(path.to_str().unwrap())
 		.into_function()
 		.unwrap()
 		.dump(true);
