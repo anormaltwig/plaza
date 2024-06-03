@@ -1,9 +1,10 @@
 #![feature(proc_macro_span)]
+#![feature(track_path)]
 
 use std::fs;
 
 use mlua::Lua;
-use proc_macro::{Literal, Span, TokenStream, TokenTree};
+use proc_macro::{tracked_path, Literal, Span, TokenStream, TokenTree};
 use syn::{
 	parse::{Parse, ParseStream},
 	parse_macro_input, LitStr,
@@ -31,6 +32,7 @@ pub fn include_lua(tokens: TokenStream) -> TokenStream {
 	path.push(target);
 
 	let file = fs::read(&path).expect("Failed to read file.");
+	tracked_path::path(&path.to_str().unwrap());
 
 	let lua = Lua::new();
 	let data = lua
