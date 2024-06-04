@@ -162,7 +162,7 @@ impl User {
 		}
 
 		let mut packet = [0; 1024];
-		let n = self.read(&mut packet)?;
+		let n = self.read(&mut packet[..size as usize])?;
 		if n < size as usize {
 			return None;
 		}
