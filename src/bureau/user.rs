@@ -118,11 +118,12 @@ impl User {
 
 	/// Poll a single event from this User.
 	pub fn poll(&mut self) -> Option<UserEvent> {
-		// Init with u8::MAX so if the read pulls 0 bytes
-		// the buffer should be unchanged and the match
-		// will set connected to false and return.
-		let mut buf: [u8; 1] = [u8::MAX];
-		let _ = self.read(&mut buf)?;
+		let mut buf: [u8; 1] = [0];
+		let n = self.read(&mut buf)?;
+		if n == 0 {
+			return None;
+		}
+
 		let packet_type = buf[0];
 
 		match packet_type {
@@ -154,7 +155,13 @@ impl User {
 		let opcode = msg_header.read_u32(8);
 		let size = msg_header.read_u32(12);
 
-		let mut packet = vec![0u8; size as usize];
+		// Would be a bad idea to dynamically allocate a number of bytes that could be u32::MAX.
+		if size > 1024 {
+			self.connected = false;
+			return None;
+		}
+
+		let mut packet = [0; 1024];
 		let n = self.read(&mut packet)?;
 		if n < size as usize {
 			return None;
