@@ -16,7 +16,7 @@ struct Args {
 	wls: bool,
 
 	/// IP or Domain of the server.
-	#[arg(long, default_value_t = ("127.0.0.1").to_string())]
+	#[arg(long, default_value_t = ("127.0.0.1").into())]
 	host_name: String,
 
 	/// Maximum number of bureaus per wrl to create in WLS mode.
@@ -28,7 +28,7 @@ struct Args {
 	wrl_list: Option<String>,
 
 	/// Bureau/WLS port.
-	#[arg(short, long, default_value_t = 5126)]
+	#[arg(short, long, default_value_t = 5126, value_parser = clap::value_parser!(u16).range(1..))]
 	port: u16,
 
 	/// Maximum number of users that each Bureau can have.
