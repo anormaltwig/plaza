@@ -1,4 +1,3 @@
-#[allow(clippy::module_inception)] // Shut up
 mod bureau;
 pub use bureau::*;
 

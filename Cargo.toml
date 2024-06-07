@@ -17,3 +17,6 @@ anyhow = "1.0.80"
 branch-macro = { path = "branch-macro" }
 clap = { version = "4.5.1", features = ["derive"] }
 mlua = { version = "0.9.6", features = ["luajit", "vendored"] }
+
+[lints.clippy]
+module_inception = "allow"
