@@ -1,6 +1,6 @@
 [package]
-name = "branch"
-version = "0.1.0"
+name = "spark"
+version = "0.5.4"
 edition = "2021"
 
 [profile.dev.package."*"]
@@ -14,7 +14,7 @@ codegen-units = 1
 
 [dependencies]
 anyhow = "1.0.80"
-branch-macro = { path = "branch-macro" }
+spark-macro = { path = "spark-macro" }
 clap = { version = "4.5.1", features = ["derive"] }
 mlua = { version = "0.9.6", features = ["luajit", "vendored"] }
 

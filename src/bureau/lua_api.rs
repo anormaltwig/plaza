@@ -7,8 +7,8 @@ use std::{
 	rc::Rc,
 };
 
-use branch_macro::include_lua;
 use mlua::{ChunkMode, FromLuaMulti, Function, IntoLuaMulti, Lua, RegistryKey, Table};
+use spark_macro::include_lua;
 
 use super::{
 	math::{Mat3, Vector3},
