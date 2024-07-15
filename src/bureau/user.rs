@@ -22,6 +22,14 @@ pub enum UserEvent {
 	ApplSpecific(Strategy, i32, String, String, i32),
 }
 
+fn validate_avatar(avatar: String) -> String {
+	if !avatar.starts_with("avtwrl/") {
+		return String::from("avtwrl/01cat.wrl");
+	}
+
+	avatar
+}
+
 pub struct User {
 	pub id: i32,
 	pub aura: HashSet<i32>,
@@ -201,7 +209,7 @@ impl User {
 			return None;
 		}
 
-		let avatar = packet.read_string(username.len() + 1);
+		let avatar = validate_avatar(packet.read_string(username.len() + 1));
 
 		self.username.clone_from(&username);
 		self.avatar.clone_from(&avatar);
@@ -317,7 +325,7 @@ impl User {
 	}
 
 	fn avatar_change(&mut self, content: &[u8]) -> Option<UserEvent> {
-		let avatar = content.read_string(0);
+		let avatar = validate_avatar(content.read_string(0));
 		self.avatar.clone_from(&avatar);
 
 		Some(UserEvent::AvatarChange(avatar))

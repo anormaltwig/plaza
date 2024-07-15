@@ -23,6 +23,7 @@ impl Parse for MacroInput {
 #[proc_macro]
 pub fn include_lua(tokens: TokenStream) -> TokenStream {
 	let target = parse_macro_input!(tokens as MacroInput).0;
+
 	let mut path = Span::call_site()
 		.source_file()
 		.path()
@@ -32,7 +33,7 @@ pub fn include_lua(tokens: TokenStream) -> TokenStream {
 	path.push(target);
 
 	let file = fs::read(&path).expect("Failed to read file.");
-	tracked_path::path(&path.to_str().unwrap());
+	tracked_path::path(path.to_str().unwrap());
 
 	let lua = Lua::new();
 	let data = lua
