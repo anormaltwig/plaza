@@ -23,8 +23,6 @@ struct Funcs {
 	name_change: RegistryKey,
 	avatar_change: RegistryKey,
 	private_chat: RegistryKey,
-	// aura_enter: RegistryKey,
-	// aura_leave: RegistryKey,
 	user_disconnect: RegistryKey,
 	plugins_loaded: RegistryKey,
 }
@@ -143,8 +141,6 @@ impl Funcs {
 			name_change: lua.create_registry_value(tbl.get::<Function>("name_change")?)?,
 			avatar_change: lua.create_registry_value(tbl.get::<Function>("avatar_change")?)?,
 			private_chat: lua.create_registry_value(tbl.get::<Function>("private_chat")?)?,
-			// aura_enter: lua.create_registry_value(tbl.get::<Function>("aura_enter")?)?,
-			// aura_leave: lua.create_registry_value(tbl.get::<Function>("aura_leave")?)?,
 			user_disconnect: lua.create_registry_value(tbl.get::<Function>("user_disconnect")?)?,
 			plugins_loaded: lua.create_registry_value(tbl.get::<Function>("plugins_loaded")?)?,
 		})
@@ -268,16 +264,6 @@ impl LuaApi {
 	pub fn private_chat(&self, id1: i32, id2: i32, msg: &str) -> Option<String> {
 		self.call::<_, Option<String>>(&self.funcs.private_chat, (id1, id2, msg))?
 	}
-
-	/*
-	pub fn aura_enter(&self, id1: i32, id2: i32) {
-		let _ = self.call::<_, Option<String>>(&self.funcs.aura_enter, (id1, id2));
-	}
-
-	pub fn aura_leave(&self, id1: i32, id2: i32) {
-		let _ = self.call::<_, Option<String>>(&self.funcs.aura_leave, (id1, id2));
-	}
-	*/
 
 	pub fn user_disconnect(&self, id: i32) {
 		let _ = self.call::<_, Option<String>>(&self.funcs.user_disconnect, id);

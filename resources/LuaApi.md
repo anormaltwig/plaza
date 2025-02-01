@@ -22,10 +22,6 @@ Lua api for bureau plugins.
 
 `hook.onPrivateChat(fn: fun(sender: User, receiver: User, msg: string):string?)`
 
-`hook.onAuraEnter(fn: fun(u1: User, u2: User))`
-
-`hook.onAuraLeave(fn: fun(u1: User, u2: User))`
-
 `hook.onUserDisconnect(fn: fun(user: User))`
 
 `hook.onPluginsLoaded(fn: fun())`
