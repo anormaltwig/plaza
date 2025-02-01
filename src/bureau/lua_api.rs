@@ -1,30 +1,17 @@
 use std::{
-	cell::RefCell,
 	fs,
 	io::{self, ErrorKind},
 	net::{IpAddr, SocketAddr},
 	path::PathBuf,
-	rc::Rc,
 };
 
 use mlua::{ChunkMode, FromLuaMulti, Function, IntoLuaMulti, Lua, RegistryKey, Table};
-use spark_macro::include_lua;
 
 use super::{
 	math::{Mat3, Vector3},
 	protocol::{ByteWriter, MsgCommon, Strategy},
-	user_list::UserList,
+	user_list::{AwesomeCell, UserList},
 };
-
-type EventQueue = Rc<RefCell<Vec<(i32, LuaEvent)>>>;
-
-pub enum LuaEvent {
-	SetPos(Vector3),
-	SetRot(Mat3),
-	SendMsg(String),
-	SendPacket(ByteWriter),
-	Disconnect,
-}
 
 struct Funcs {
 	think: RegistryKey,
@@ -36,24 +23,28 @@ struct Funcs {
 	name_change: RegistryKey,
 	avatar_change: RegistryKey,
 	private_chat: RegistryKey,
-	aura_enter: RegistryKey,
-	aura_leave: RegistryKey,
+	// aura_enter: RegistryKey,
+	// aura_leave: RegistryKey,
 	user_disconnect: RegistryKey,
 	plugins_loaded: RegistryKey,
 }
 
+#[allow(unused_mut)]
 impl Funcs {
-	pub fn init(lua: &mut Lua, event_queue: &EventQueue) -> mlua::Result<Self> {
+	pub fn init(lua: &mut Lua, user_list: AwesomeCell<UserList>) -> mlua::Result<Self> {
 		let tbl = lua.create_table()?;
 
 		tbl.set(
 			"set_pos",
 			lua.create_function({
-				let event_queue = event_queue.clone();
+				let user_list = user_list.clone();
 				move |_, (id, x, y, z): (i32, f32, f32, f32)| {
-					event_queue
-						.borrow_mut()
-						.push((id, LuaEvent::SetPos(Vector3::new(x, y, z))));
+					let mut ul = user_list.get_mut();
+					let Some(user) = ul.users.get_mut(&id) else {
+						return Err(mlua::Error::external("invalid user"));
+					};
+
+					user.set_pos(Vector3::new(x, y, z));
 					Ok(())
 				}
 			})?,
@@ -62,11 +53,14 @@ impl Funcs {
 		tbl.set(
 			"set_rot",
 			lua.create_function({
-				let event_queue = event_queue.clone();
+				let user_list = user_list.clone();
 				move |_, (id, arr): (i32, [f32; 9])| {
-					event_queue
-						.borrow_mut()
-						.push((id, LuaEvent::SetRot(Mat3 { data: arr })));
+					let mut ul = user_list.get_mut();
+					let Some(user) = ul.users.get_mut(&id) else {
+						return Err(mlua::Error::external("invalid user"));
+					};
+
+					user.set_rot(Mat3 { data: arr });
 					Ok(())
 				}
 			})?,
@@ -75,9 +69,23 @@ impl Funcs {
 		tbl.set(
 			"send_msg",
 			lua.create_function({
-				let event_queue = event_queue.clone();
+				let user_list = user_list.clone();
 				move |_, (id, msg): (i32, String)| {
-					event_queue.borrow_mut().push((id, LuaEvent::SendMsg(msg)));
+					let mut ul = user_list.get_mut();
+					let Some(user) = ul.users.get_mut(&id) else {
+						return Err(mlua::Error::external("invalid user"));
+					};
+
+					user.send(
+						&ByteWriter::message_common(
+							user.id(),
+							user.id(),
+							MsgCommon::ChatSend,
+							Strategy::AllClientsExceptSender,
+							&ByteWriter::new(msg.len() + 1).write_string(&msg).bytes,
+						)
+						.bytes,
+					);
 					Ok(())
 				}
 			})?,
@@ -86,14 +94,14 @@ impl Funcs {
 		tbl.set(
 			"send_packet",
 			lua.create_function({
-				let event_queue = event_queue.clone();
+				let user_list = user_list.clone();
 				move |_, (id, msg): (i32, mlua::String)| {
-					event_queue.borrow_mut().push((
-						id,
-						LuaEvent::SendPacket(ByteWriter {
-							bytes: msg.as_bytes().to_vec(),
-						}),
-					));
+					let mut ul = user_list.get_mut();
+					let Some(user) = ul.users.get_mut(&id) else {
+						return Err(mlua::Error::external("invalid user"));
+					};
+
+					user.send(&msg.as_bytes());
 					Ok(())
 				}
 			})?,
@@ -102,38 +110,43 @@ impl Funcs {
 		tbl.set(
 			"disconnect",
 			lua.create_function({
-				let event_queue = event_queue.clone();
+				let user_list = user_list.clone();
 				move |_, id: i32| {
-					event_queue.borrow_mut().push((id, LuaEvent::Disconnect));
+					let mut ul = user_list.get_mut();
+					let Some(user) = ul.users.get_mut(&id) else {
+						return Err(mlua::Error::external("invalid user"));
+					};
+
+					user.disconnect();
 					Ok(())
 				}
 			})?,
 		)?;
 
-		lua.load(include_lua!("lua/vector.lua").as_ref()).exec()?;
-		lua.load(include_lua!("lua/basis.lua").as_ref()).exec()?;
+		lua.load(include_str!("lua/vector.lua")).exec()?;
+		lua.load(include_str!("lua/basis.lua")).exec()?;
 
 		let (users, user_meta): (Table, Table) =
-			lua.load(include_lua!("lua/user.lua").as_ref()).call(tbl)?;
+			lua.load(include_str!("lua/user.lua")).call(tbl)?;
 
 		let tbl: Table = lua
-			.load(include_lua!("lua/hook.lua").as_ref())
+			.load(include_str!("lua/hook.lua"))
 			.call((users, user_meta))?;
 
 		Ok(Self {
-			think: lua.create_registry_value::<Function>(tbl.get("think")?)?,
-			user_connect: lua.create_registry_value::<Function>(tbl.get("user_connect")?)?,
-			new_user: lua.create_registry_value::<Function>(tbl.get("new_user")?)?,
-			pos_update: lua.create_registry_value::<Function>(tbl.get("pos_update")?)?,
-			trans_update: lua.create_registry_value::<Function>(tbl.get("trans_update")?)?,
-			chat_send: lua.create_registry_value::<Function>(tbl.get("chat_send")?)?,
-			name_change: lua.create_registry_value::<Function>(tbl.get("name_change")?)?,
-			avatar_change: lua.create_registry_value::<Function>(tbl.get("avatar_change")?)?,
-			private_chat: lua.create_registry_value::<Function>(tbl.get("private_chat")?)?,
-			aura_enter: lua.create_registry_value::<Function>(tbl.get("aura_enter")?)?,
-			aura_leave: lua.create_registry_value::<Function>(tbl.get("aura_leave")?)?,
-			user_disconnect: lua.create_registry_value::<Function>(tbl.get("user_disconnect")?)?,
-			plugins_loaded: lua.create_registry_value::<Function>(tbl.get("plugins_loaded")?)?,
+			think: lua.create_registry_value(tbl.get::<Function>("think")?)?,
+			user_connect: lua.create_registry_value(tbl.get::<Function>("user_connect")?)?,
+			new_user: lua.create_registry_value(tbl.get::<Function>("new_user")?)?,
+			pos_update: lua.create_registry_value(tbl.get::<Function>("pos_update")?)?,
+			trans_update: lua.create_registry_value(tbl.get::<Function>("trans_update")?)?,
+			chat_send: lua.create_registry_value(tbl.get::<Function>("chat_send")?)?,
+			name_change: lua.create_registry_value(tbl.get::<Function>("name_change")?)?,
+			avatar_change: lua.create_registry_value(tbl.get::<Function>("avatar_change")?)?,
+			private_chat: lua.create_registry_value(tbl.get::<Function>("private_chat")?)?,
+			// aura_enter: lua.create_registry_value(tbl.get::<Function>("aura_enter")?)?,
+			// aura_leave: lua.create_registry_value(tbl.get::<Function>("aura_leave")?)?,
+			user_disconnect: lua.create_registry_value(tbl.get::<Function>("user_disconnect")?)?,
+			plugins_loaded: lua.create_registry_value(tbl.get::<Function>("plugins_loaded")?)?,
 		})
 	}
 }
@@ -141,7 +154,6 @@ impl Funcs {
 pub struct LuaApi {
 	lua: Lua,
 	funcs: Funcs,
-	event_queue: EventQueue,
 }
 
 fn do_file(lua: &mut Lua, path: PathBuf) -> mlua::Result<()> {
@@ -191,60 +203,26 @@ fn load_plugins(lua: &mut Lua) -> io::Result<()> {
 }
 
 impl LuaApi {
-	pub fn new() -> anyhow::Result<Self> {
+	pub fn new(user_list: AwesomeCell<UserList>) -> mlua::Result<Self> {
 		let mut lua = unsafe { Lua::unsafe_new() };
 
-		let event_queue = Rc::new(RefCell::new(Vec::new()));
-		let funcs = Funcs::init(&mut lua, &event_queue)?;
+		let funcs = Funcs::init(&mut lua, user_list)?;
 		load_plugins(&mut lua)?;
 
-		let lua_api = Self {
-			lua,
-			funcs,
-			event_queue,
-		};
+		let lua_api = Self { lua, funcs };
 
 		lua_api.call::<_, ()>(&lua_api.funcs.plugins_loaded, ());
 
 		Ok(lua_api)
 	}
 
-	pub fn run_events(&mut self, user_list: &mut UserList) {
-		let mut event_queue = self.event_queue.borrow_mut();
-		if event_queue.is_empty() {
-			return;
-		}
-
-		for (id, event) in event_queue.drain(..) {
-			let Some(user) = user_list.get_mut(&id) else {
-				continue;
-			};
-
-			match event {
-				LuaEvent::SetPos(pos) => user.set_pos(pos),
-				LuaEvent::SetRot(rot) => user.set_rot(rot),
-				LuaEvent::SendMsg(msg) => user.send(&ByteWriter::message_common(
-					user.id,
-					user.id,
-					MsgCommon::ChatSend,
-					Strategy::AllClientsExceptSender,
-					&ByteWriter::new(msg.len() + 1).write_string(&msg).bytes,
-				)),
-				LuaEvent::SendPacket(packet) => user.send(&packet),
-				LuaEvent::Disconnect => user.connected = false,
-			}
-		}
-
-		event_queue.shrink_to_fit();
-	}
-
 	fn call<A, R>(&self, rk: &RegistryKey, args: A) -> Option<R>
 	where
-		A: for<'a> IntoLuaMulti<'a>,
-		R: for<'a> FromLuaMulti<'a>,
+		A: IntoLuaMulti,
+		R: FromLuaMulti,
 	{
 		let f = self.lua.registry_value::<Function>(rk).ok()?;
-		match f.call::<A, R>(args) {
+		match f.call::<R>(args) {
 			Ok(r) => Some(r),
 			Err(e) => {
 				eprintln!("Lua Error: {}", e);
@@ -291,6 +269,7 @@ impl LuaApi {
 		self.call::<_, Option<String>>(&self.funcs.private_chat, (id1, id2, msg))?
 	}
 
+	/*
 	pub fn aura_enter(&self, id1: i32, id2: i32) {
 		let _ = self.call::<_, Option<String>>(&self.funcs.aura_enter, (id1, id2));
 	}
@@ -298,6 +277,7 @@ impl LuaApi {
 	pub fn aura_leave(&self, id1: i32, id2: i32) {
 		let _ = self.call::<_, Option<String>>(&self.funcs.aura_leave, (id1, id2));
 	}
+	*/
 
 	pub fn user_disconnect(&self, id: i32) {
 		let _ = self.call::<_, Option<String>>(&self.funcs.user_disconnect, id);

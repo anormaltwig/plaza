@@ -43,13 +43,15 @@ The first packet sent by a connected client contains "hello" as well as two `uin
 | VscpVerMajor | 1 | int8 | |
 | VscpVerMinor | 1 | int8 | |
 
+- Technically not always `hello`. Original bureau software contains cases for `hella` (AO), `admin` (admin console), and `vchat` (unfinished voice chat).
+
 ### Hello (Server Response)
 
 After the initial hello packet is sent by a client the server will respond with its own hello packet.
 
 | Name | Bytes | Type | Description |
 | --- | --- | --- | --- |
-| Hello | 5 | data | Always `hello` |
+| Hello | 6 | data | `hello\0` when accepted or `reject` if rejected |
 | ??? | 4 | int32 | Unknown uint32, seems to always be 0 |
 | Connection ID | 4 | int32 | Client's unique ID |
 

@@ -1,9 +1,9 @@
 use std::{
-	net::{IpAddr, Ipv4Addr, SocketAddr},
+	net::{Ipv4Addr, SocketAddrV4},
 	time::Instant,
 };
 
-use crate::bureau::{Bureau, BureauOptions};
+use crate::bureau::{Bureau, BureauConfig};
 
 struct BureauEx {
 	start_time: Instant,
@@ -13,13 +13,13 @@ struct BureauEx {
 pub struct BureauManager {
 	bureaus: Vec<BureauEx>,
 	max: usize,
-	bureau_options: BureauOptions,
+	bureau_options: BureauConfig,
 }
 
 impl BureauManager {
-	const BIND_ADDR: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0);
+	const BIND_ADDR: SocketAddrV4 = SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0);
 
-	pub fn new(max: usize, bureau_options: BureauOptions) -> Self {
+	pub fn new(max: usize, bureau_options: BureauConfig) -> Self {
 		Self {
 			bureaus: Vec::with_capacity(max),
 			max,
@@ -29,20 +29,25 @@ impl BureauManager {
 
 	pub fn poll(&mut self) {
 		self.bureaus.retain_mut(|bureau_ex| {
-			bureau_ex.inner.poll();
-			bureau_ex.start_time.elapsed().as_secs() < 10 || bureau_ex.inner.user_list.len() > 0
+			if let Err(err) = bureau_ex.inner.poll() {
+				eprintln!("error during bureau loop {}", err);
+			}
+
+			bureau_ex.start_time.elapsed().as_secs() < 10
+				|| bureau_ex.inner.user_count() > 0
 		})
 	}
 
 	pub fn available(&mut self) -> Option<u16> {
 		if let Some(bureau_ex) = self.bureaus.iter().find(|bureau_ex| {
-			bureau_ex.inner.user_list.len() < bureau_ex.inner.options.max_players as usize
+			bureau_ex.inner.user_count()
+				< bureau_ex.inner.config().max_users as usize
 		}) {
 			return Some(bureau_ex.inner.port());
 		}
 
 		if self.bureaus.len() < self.max {
-			let bureau = Bureau::new(Self::BIND_ADDR, self.bureau_options).ok()?;
+			let bureau = Bureau::new(Self::BIND_ADDR, self.bureau_options.clone()).ok()?;
 			let port = bureau.port();
 
 			self.bureaus.push(BureauEx {

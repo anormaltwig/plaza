@@ -31,15 +31,17 @@ fn validate_avatar(avatar: String) -> String {
 }
 
 pub struct User {
-	pub id: i32,
-	pub aura: HashSet<i32>,
-	pub connected: bool,
-	pub username: String,
-	pub avatar: String,
-	pub data: String,
-
-	addr: SocketAddr,
 	socket: TcpStream,
+	addr: SocketAddr,
+	connected: bool,
+
+	id: i32,
+	aura: HashSet<i32>,
+
+	username: String,
+	avatar: String,
+	data: String,
+
 	position: Vector3,
 	rotation: Mat3,
 }
@@ -47,15 +49,17 @@ pub struct User {
 impl User {
 	pub fn new(id: i32, socket: TcpStream) -> io::Result<Self> {
 		Ok(Self {
+			addr: socket.peer_addr()?,
+			socket,
+			connected: true,
+
 			id,
 			aura: HashSet::new(),
-			connected: true,
+
 			username: String::new(),
 			avatar: String::new(),
 			data: String::new(),
 
-			addr: socket.peer_addr()?,
-			socket,
 			position: Vector3::new(0.0, 0.0, 0.0),
 			rotation: Mat3::new(),
 		})
@@ -66,9 +70,70 @@ impl User {
 		&self.addr
 	}
 
+	pub fn connected(&self) -> bool {
+		self.connected
+	}
+
+	pub fn disconnect(&mut self) {
+		self.connected = false
+	}
+
+	pub fn id(&self) -> i32 {
+		self.id
+	}
+
+	pub fn aura(&self) -> &HashSet<i32> {
+		&self.aura
+	}
+
+	pub fn add_aura(&mut self, other: &User) {
+		self.aura.insert(other.id);
+		self.send(
+			&ByteWriter::general_message(
+				self.id,
+				other.id,
+				Opcode::SMsgUserJoined,
+				&ByteWriter::new(8)
+					.write_i32(other.id)
+					.write_i32(other.id)
+					.write_string(&other.avatar)
+					.write_string(&other.username)
+					.bytes,
+			)
+			.bytes,
+		);
+		self.send(
+			&ByteWriter::message_common(
+				self.id,
+				other.id,
+				MsgCommon::CharacterUpdate,
+				Strategy::AuraClientsExceptSender,
+				&ByteWriter::new(0).write_string(&other.data).bytes,
+			)
+			.bytes,
+		);
+	}
+
+	pub fn remove_aura(&mut self, other: &User) {
+		self.aura.remove(&other.id);
+		self.send(
+			&ByteWriter::general_message(
+				self.id,
+				other.id,
+				Opcode::SMsgUserLeft,
+				&other.id.to_be_bytes(),
+			)
+			.bytes,
+		);
+	}
+
+	pub fn username(&self) -> &String {
+		&self.username
+	}
+
 	/// Set user position.
 	pub fn set_pos(&mut self, pos: Vector3) {
-		self.send(&ByteWriter::position_update(self.id, &pos));
+		self.send(&ByteWriter::position_update(self.id, &pos).bytes);
 		self.position = pos;
 	}
 	/// Get user position.
@@ -89,19 +154,22 @@ impl User {
 			.write_f32(self.position.y)
 			.write_f32(self.position.z);
 
-		self.send(&ByteWriter::message_common(
-			self.id,
-			self.id,
-			MsgCommon::TransformUpdate,
-			Strategy::AuraClients,
-			&transform_update.bytes,
-		));
+		self.send(
+			&ByteWriter::message_common(
+				self.id,
+				self.id,
+				MsgCommon::TransformUpdate,
+				Strategy::AuraClients,
+				&transform_update.bytes,
+			)
+			.bytes,
+		);
 		self.rotation = rot;
 	}
 
 	/// Send all data within a ByteWriter to the socket this User contains.
-	pub fn send(&mut self, stream: &ByteWriter) {
-		if self.socket.write_all(&stream.bytes).is_err() {
+	pub fn send(&mut self, buf: &[u8]) {
+		if self.socket.write_all(buf).is_err() {
 			self.connected = false;
 		}
 	}
@@ -214,31 +282,35 @@ impl User {
 		self.username.clone_from(&username);
 		self.avatar.clone_from(&avatar);
 
-		self.send(&ByteWriter::general_message(
-			0,
-			self.id,
-			Opcode::SMsgClientId,
-			&self.id.to_be_bytes(),
-		));
-
-		self.send(&ByteWriter::general_message(
-			self.id,
-			self.id,
-			Opcode::SMsgUserJoined,
-			&ByteWriter::new(8)
-				.write_i32(self.id)
-				.write_i32(self.id)
-				.write_string(&self.avatar)
-				.write_string(&self.username)
+		self.send(
+			&ByteWriter::general_message(0, self.id, Opcode::SMsgClientId, &self.id.to_be_bytes())
 				.bytes,
-		));
+		);
 
-		self.send(&ByteWriter::general_message(
-			self.id,
-			self.id,
-			Opcode::SMsgBroadcastId,
-			&self.id.to_be_bytes(),
-		));
+		self.send(
+			&ByteWriter::general_message(
+				self.id,
+				self.id,
+				Opcode::SMsgUserJoined,
+				&ByteWriter::new(8)
+					.write_i32(self.id)
+					.write_i32(self.id)
+					.write_string(&self.avatar)
+					.write_string(&self.username)
+					.bytes,
+			)
+			.bytes,
+		);
+
+		self.send(
+			&ByteWriter::general_message(
+				self.id,
+				self.id,
+				Opcode::SMsgBroadcastId,
+				&self.id.to_be_bytes(),
+			)
+			.bytes,
+		);
 
 		Some(UserEvent::NewUser(username, avatar))
 	}

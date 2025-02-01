@@ -1,13 +1,11 @@
+use clap::Parser;
+use std::net::{Ipv4Addr, SocketAddrV4};
+
+use bureau::{Bureau, BureauConfig};
+use wls::WlsOptions;
+
 mod bureau;
 mod wls;
-
-use clap::Parser;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-
-use crate::{
-	bureau::{Bureau, BureauOptions},
-	wls::WlsOptions,
-};
 
 #[derive(Parser)]
 struct Args {
@@ -33,50 +31,43 @@ struct Args {
 
 	/// Maximum number of users that each Bureau can have.
 	#[arg(short, long, default_value_t = 256)]
-	max_players: i32,
+	max_users: i32,
 
 	/// Radius to add two users to each others aura.
-	#[arg(short, long, default_value_t = 300.0)]
+	#[arg(short, long, default_value_t = 200.0)]
 	aura_radius: f32,
 }
 
 fn main() {
 	let args = Args::parse();
 
-	let bureau_options = BureauOptions {
-		max_players: args.max_players,
-		aura_radius: args.aura_radius,
+	let ip = Ipv4Addr::new(0, 0, 0, 0);
+	let addr = SocketAddrV4::new(ip, args.port);
+
+	let bureau_config = BureauConfig {
+		connect_timeout: 10,
+		max_users: 128,
+		aura_radius: 200.0,
 	};
 
-	let bind_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), args.port);
-
 	if args.wls {
-		// Never returns unless it errors.
 		let err = wls::run(
-			bind_addr,
+			addr,
 			WlsOptions {
 				host_name: args.host_name,
 				max_bureaus: args.max_bureaus,
 				wrl_list: args.wrl_list,
-				bureau_options,
+				bureau_config,
 			},
 		)
 		.unwrap_err();
 
-		eprintln!("Failed to run WLS: {}", err);
+		eprintln!("Error running WLS: {}", err);
 
 		return;
 	}
 
-	let mut bureau = match Bureau::new(bind_addr, bureau_options) {
-		Ok(bureau) => bureau,
-		Err(err) => {
-			eprintln!("Failed to run Bureau: '{}'.", err);
-
-			return;
-		}
-	};
-
-	println!("Bureau running on port: {}.", bureau.port());
-	bureau.run();
+	Bureau::new(addr, bureau_config)
+		.expect("failed to create bureau")
+		.run();
 }
