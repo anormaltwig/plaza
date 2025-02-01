@@ -1,4 +1,4 @@
-use std::{io, net::SocketAddrV4};
+use std::{io, net::SocketAddrV4, thread, time::Duration};
 
 use listener::{Listener, ListenerEvent};
 use lua_api::LuaApi;
@@ -72,6 +72,7 @@ impl Bureau {
 	pub fn run(&mut self) -> ! {
 		loop {
 			self.poll().expect("error during poll");
+			thread::sleep(Duration::from_millis(100));
 		}
 	}
 
@@ -166,9 +167,11 @@ impl Bureau {
 		user_list.master();
 		user_list.send_user_count();
 
-		let user = user_list.users.get_mut(&id).unwrap();
+		let ip = user_list.users.get_mut(&id).unwrap().addr().ip();
+		drop(user_list);
+
 		self.lua_api
-			.new_user(id, &username, &avatar, user.addr().ip());
+			.new_user(id, &username, &avatar, ip);
 	}
 
 	fn position_update(&mut self, id: i32, pos: Vector3) {
@@ -284,8 +287,6 @@ impl Bureau {
 	}
 
 	fn private_chat(&mut self, id: i32, receiver: i32, mut text: String) {
-		let mut user_list = self.user_list.get_mut();
-
 		let is_special = matches!(
 			text.as_str(),
 			"%%REQ" | "%%RINGING" | "%%REJECT" | "%%ACCEPT" | "%%OK" | "%%BUSY" | "%%END"
@@ -313,11 +314,12 @@ impl Bureau {
 
 			text = format!(
 				"{}: {}",
-				user_list.users.get(&id).unwrap().username(),
+				self.user_list.get().users.get(&id).unwrap().username(),
 				content
 			);
 		}
 
+		let mut user_list = self.user_list.get_mut();
 		let Some(other) = user_list.users.get_mut(&receiver) else {
 			return;
 		};
