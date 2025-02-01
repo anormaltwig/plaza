@@ -33,15 +33,13 @@ impl BureauManager {
 				eprintln!("error during bureau loop {}", err);
 			}
 
-			bureau_ex.start_time.elapsed().as_secs() < 10
-				|| bureau_ex.inner.user_count() > 0
+			bureau_ex.start_time.elapsed().as_secs() < 10 || bureau_ex.inner.user_count() > 0
 		})
 	}
 
 	pub fn available(&mut self) -> Option<u16> {
 		if let Some(bureau_ex) = self.bureaus.iter().find(|bureau_ex| {
-			bureau_ex.inner.user_count()
-				< bureau_ex.inner.config().max_users as usize
+			bureau_ex.inner.user_count() < bureau_ex.inner.config().max_users as usize
 		}) {
 			return Some(bureau_ex.inner.port());
 		}
