@@ -1,4 +1,4 @@
-pub mod bureau_manager;
+mod bureau_manager;
 
 use std::{
 	collections::HashMap,

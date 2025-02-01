@@ -27,7 +27,7 @@ pub struct BureauConfig {
 pub struct Bureau {
 	port: u16,
 	config: BureauConfig,
-	server: Listener,
+	listener: Listener,
 	user_list: AwesomeCell<UserList>,
 
 	lua_api: LuaApi,
@@ -45,10 +45,11 @@ impl Bureau {
 
 		let user_list = AwesomeCell::new(UserList::new(config.max_users));
 		let lua_api = LuaApi::new(user_list.clone())?;
+		let listener = Listener::new(addr, config.connect_timeout)?;
 
 		Ok(Self {
-			port: addr.port(),
-			server: Listener::new(addr, config.connect_timeout)?,
+			port: listener.port(),
+			listener,
 			config,
 
 			user_list,
@@ -77,11 +78,11 @@ impl Bureau {
 	}
 
 	pub fn poll(&mut self) -> io::Result<()> {
-		if let Some(event) = self.server.poll_event()? {
+		if let Some(event) = self.listener.poll_event()? {
 			match event {
 				ListenerEvent::Incoming(addr) => {
 					if !self.lua_api.user_connect(addr) {
-						self.server.deny_last();
+						self.listener.deny_last();
 					}
 				}
 				ListenerEvent::Accepted(stream) => {
@@ -149,6 +150,10 @@ impl Bureau {
 	fn update_aura(&mut self, id: i32) {
 		let mut user_list = self.user_list.get_mut();
 		user_list.for_others(id, |user, other| {
+			if !other.initialized() {
+				return;
+			}
+
 			let in_radius = user.pos().distance_sqr(other.pos()) <= self.config.aura_radius.powi(2);
 			let in_aura = user.aura().contains(&other.id());
 
@@ -170,8 +175,7 @@ impl Bureau {
 		let ip = user_list.users.get_mut(&id).unwrap().addr().ip();
 		drop(user_list);
 
-		self.lua_api
-			.new_user(id, &username, &avatar, ip);
+		self.lua_api.new_user(id, &username, &avatar, ip);
 	}
 
 	fn position_update(&mut self, id: i32, pos: Vector3) {

@@ -36,6 +36,7 @@ pub struct User {
 	connected: bool,
 
 	id: i32,
+	initialized: bool,
 	aura: HashSet<i32>,
 
 	username: String,
@@ -54,6 +55,7 @@ impl User {
 			connected: true,
 
 			id,
+			initialized: false,
 			aura: HashSet::new(),
 
 			username: String::new(),
@@ -80,6 +82,10 @@ impl User {
 
 	pub fn id(&self) -> i32 {
 		self.id
+	}
+
+	pub fn initialized(&self) -> bool {
+		self.initialized
 	}
 
 	pub fn aura(&self) -> &HashSet<i32> {
@@ -311,6 +317,8 @@ impl User {
 			)
 			.bytes,
 		);
+
+		self.initialized = true; // ready for aura updates
 
 		Some(UserEvent::NewUser(username, avatar))
 	}

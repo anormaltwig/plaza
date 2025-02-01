@@ -10,6 +10,7 @@ pub enum ListenerEvent {
 }
 
 pub struct Listener {
+	port: u16,
 	timeout: u64,
 	listener: TcpListener,
 	queue: Vec<(TcpStream, Instant)>,
@@ -20,11 +21,18 @@ impl Listener {
 		let listener = TcpListener::bind(addr)?;
 		listener.set_nonblocking(true)?;
 
+		let port = listener.local_addr()?.port();
+
 		Ok(Self {
+			port,
+			timeout,
 			listener,
 			queue: Vec::new(),
-			timeout,
 		})
+	}
+
+	pub fn port(&self) -> u16 {
+		self.port
 	}
 
 	pub fn deny_last(&mut self) {
