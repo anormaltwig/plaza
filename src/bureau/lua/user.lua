@@ -27,7 +27,7 @@ end
 --- Set User's position.
 ---@param pos Vector
 function user_meta:setPos(pos)
-	self.pos = pos:clone()
+	self._pos = pos:clone()
 	return set_pos(self.id, pos[1], pos[2], pos[3])
 end
 
@@ -40,6 +40,7 @@ end
 --- Set User's rotation.
 ---@param rot Basis
 function user_meta:setRot(rot)
+	self._rot = rot
 	return set_rot(self.id, rot)
 end
 
@@ -49,7 +50,7 @@ function user_meta:getRot()
 	return self._rot:clone()
 end
 
---- Send a packet to the User.
+--- Send a message to the User's chat.
 ---@param msg string
 function user_meta:sendMsg(msg)
 	send_msg(self.id, msg)

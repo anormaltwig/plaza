@@ -13,21 +13,24 @@ struct Args {
 	#[arg(short, long)]
 	wls: bool,
 
-	/// IP or Domain of the server.
-	#[arg(long, default_value_t = ("127.0.0.1").into())]
-	host_name: String,
-
-	/// Maximum number of bureaus per wrl to create in WLS mode.
-	#[arg(long, default_value_t = 3)]
-	max_bureaus: usize,
-
 	/// File path to a newline seperated list of wrls to allow in WLS mode.
 	#[arg(long)]
 	wrl_list: Option<String>,
 
+	/// IP or Domain of the server.
+	#[arg(long, default_value_t = ("127.0.0.1").into())]
+	host_name: String,
+
 	/// Bureau/WLS port.
 	#[arg(short, long, default_value_t = 5126, value_parser = clap::value_parser!(u16).range(1..))]
 	port: u16,
+
+	#[arg(long, default_value_t = 10)]
+	connect_timeout: u64,
+
+	/// Maximum number of bureaus per wrl to create in WLS mode.
+	#[arg(long, default_value_t = 3)]
+	max_bureaus: usize,
 
 	/// Maximum number of users that each Bureau can have.
 	#[arg(short, long, default_value_t = 256)]
@@ -45,9 +48,9 @@ fn main() {
 	let addr = SocketAddrV4::new(ip, args.port);
 
 	let bureau_config = BureauConfig {
-		connect_timeout: 10,
-		max_users: 128,
-		aura_radius: 200.0,
+		connect_timeout: args.connect_timeout,
+		max_users: args.max_users,
+		aura_radius: args.aura_radius,
 	};
 
 	if args.wls {
