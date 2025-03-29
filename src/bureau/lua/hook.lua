@@ -103,10 +103,10 @@ end
 local function run_hooks(tbl, ...)
 	for i = 1, #tbl do
 		local fn = tbl[i]
-		local ret = { fn(...) }
+		local ret = fn(...)
 
 		if ret then
-			return unpack(ret)
+			return ret
 		end
 	end
 end
