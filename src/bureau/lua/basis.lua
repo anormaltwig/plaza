@@ -1,6 +1,18 @@
+local Vector = require("vector")
+
 ---@class Basis
 local basis = {}
 basis.__index = basis
+
+--- Create a new basis.
+---@return Basis
+local function Basis()
+	return setmetatable({
+		1, 0, 0,
+		0, 1, 0,
+		0, 0, 1,
+	}, basis)
+end
 
 --- Set values of the basis.
 ---@param arr number[]
@@ -66,13 +78,4 @@ function basis:clone()
 	return rot
 end
 
---- Create a new basis.
----@return Basis
-function Basis()
-	return setmetatable({
-		1, 0, 0,
-		0, 1, 0,
-		0, 0, 1,
-	}, basis)
-end
-
+package.loaded["basis"] = Basis

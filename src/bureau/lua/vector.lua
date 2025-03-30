@@ -5,6 +5,15 @@
 local vec = {}
 vec.__index = vec
 
+--- Create a new vector, you can get x, y, and z components by indexing 1, 2, and 3 respectively.
+---@param x number
+---@param y number
+---@param z number
+---@return Vector
+local function Vector(x, y, z)
+	return setmetatable({x or 0, y or 0, z or 0}, vec)
+end
+
 function vec.__tostring(a)
 	return string.format("[x: %d, y: %d, z: %d]", a[1], a[2], a[3])
 end
@@ -78,12 +87,4 @@ function vec:clone()
 	return Vector(self[1], self[2], self[3])
 end
 
---- Create a new vector, you can get x, y, and z components by indexing 1, 2, and 3 respectively.
----@param x number
----@param y number
----@param z number
----@return Vector
-function Vector(x, y, z)
-	return setmetatable({x or 0, y or 0, z or 0}, vec)
-end
-
+package.loaded["vector"] = Vector

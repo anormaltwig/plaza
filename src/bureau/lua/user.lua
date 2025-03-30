@@ -68,8 +68,7 @@ end
 
 local users = {}
 
----@diagnostic disable-next-line: lowercase-global
-user_manager = {}
+local user_manager = {}
 
 --- Get all connected users.
 ---@return User[]
@@ -88,5 +87,6 @@ function user_manager.get(id)
 	return users[id]
 end
 
-return users, user_meta
+package.loaded["users"] = user_manager
 
+return users, user_meta

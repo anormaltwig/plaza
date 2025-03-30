@@ -1,7 +1,6 @@
 local users, user_meta = ...
 
----@diagnostic disable-next-line: lowercase-global
-hook = {}
+local hook = {}
 
 local function ins_tbl_ret(tbl, obj)
 	local pos = #tbl + 1
@@ -100,6 +99,8 @@ function hook.onPluginsLoaded(fn)
 	return ins_tbl_ret(plugins_loaded_hooks, fn)
 end
 
+package.loaded["hook"] = hook
+
 local function run_hooks(tbl, ...)
 	for i = 1, #tbl do
 		local fn = tbl[i]
@@ -110,6 +111,9 @@ local function run_hooks(tbl, ...)
 		end
 	end
 end
+
+local Vector = require("vector")
+local Basis = require("basis")
 
 return {
 	think = function()
@@ -191,4 +195,3 @@ return {
 		return run_hooks(plugins_loaded_hooks)
 	end
 }
-
