@@ -167,14 +167,11 @@ fn do_file(lua: &mut Lua, path: PathBuf) -> mlua::Result<()> {
 fn load_plugins(lua: &mut Lua) -> io::Result<()> {
 	let read_dir = match fs::read_dir("plugins") {
 		Ok(r) => r,
-		Err(err) => {
-			if err.kind() == ErrorKind::NotFound {
-				println!("The 'plugins' directory is missing, no plugins will be loaded.");
-				return Ok(());
-			}
-
-			return Err(err);
+		Err(e) if e.kind() == ErrorKind::NotFound => {
+			println!("The 'plugins' directory is missing, no plugins will be loaded.");
+			return Ok(());
 		}
+		Err(e) => return Err(e),
 	};
 
 	for file in read_dir {
