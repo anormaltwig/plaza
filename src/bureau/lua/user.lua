@@ -14,8 +14,8 @@ local disconnect = ftbl.disconnect
 ---@field name string
 ---@field avatar string
 ---@field ip string
----@field _pos Vector
----@field _rot Basis
+---@field _pos Vector use user:pos() instead
+---@field _rot Basis use user:rot() instead
 local user_meta = {}
 user_meta.__index = user_meta
 
@@ -26,39 +26,39 @@ end
 
 --- Set User's position.
 ---@param pos Vector
-function user_meta:setPos(pos)
+function user_meta:set_pos(pos)
 	self._pos = pos:clone()
 	return set_pos(self.id, pos[1], pos[2], pos[3])
 end
 
 --- Get User's current position.
 ---@return Vector
-function user_meta:getPos()
+function user_meta:pos()
 	return self._pos:clone()
 end
 
 --- Set User's rotation.
 ---@param rot Basis
-function user_meta:setRot(rot)
+function user_meta:set_rot(rot)
 	self._rot = rot
 	return set_rot(self.id, rot)
 end
 
 --- Set User's rotation.
 ---@return Basis
-function user_meta:getRot()
+function user_meta:rot()
 	return self._rot:clone()
 end
 
 --- Send a message to the User's chat.
 ---@param msg string
-function user_meta:sendMsg(msg)
+function user_meta:send_msg(msg)
 	send_msg(self.id, msg)
 end
 
 --- Send a packet to the User.
 ---@param msg string
-function user_meta:sendPacket(msg)
+function user_meta:send_packet(msg)
 	send_packet(self.id, msg)
 end
 
@@ -72,7 +72,7 @@ local user_manager = {}
 
 --- Get all connected users.
 ---@return User[]
-function user_manager.getAll()
+function user_manager.all()
 	local ret = {}
 	for _, user in pairs(users) do
 		table.insert(ret, user)

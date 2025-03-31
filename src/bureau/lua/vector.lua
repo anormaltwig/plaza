@@ -56,19 +56,19 @@ end
 
 --- Get the length of the vector squared. (Faster than getting the actual length)
 ---@return number
-function vec:getLengthSqr()
+function vec:length_sqr()
 	return self[1]^2 + self[2]^2 + self[3]^2
 end
 
 --- Get the length of the vector.
 ---@return number
-function vec:getLength()
+function vec:length()
 	return math.sqrt(self[1]^2 + self[2]^2 + self[3]^2)
 end
 
 --- Create a new vector with the same direction but a length of 1.
 ---@return Vector
-function vec:getNormalized()
+function vec:normalized()
 	local len = math.sqrt(self[1]^2 + self[2]^2 + self[3]^2)
 	return Vector(self[1] / len, self[2] / len, self[3] / len)
 end

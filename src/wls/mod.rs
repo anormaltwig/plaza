@@ -48,8 +48,8 @@ pub fn run(addr: SocketAddrV4, options: WlsOptions) -> io::Result<()> {
 	let mut managers = HashMap::with_capacity(wrls.len());
 	for wrl in wrls {
 		managers.insert(
-			wrl,
-			BureauManager::new(options.max_bureaus, options.bureau_config.clone()),
+			wrl.clone(),
+			BureauManager::new(wrl, options.max_bureaus, options.bureau_config.clone()),
 		);
 	}
 

@@ -11,19 +11,21 @@ struct BureauEx {
 }
 
 pub struct BureauManager {
+	wrl: String,
 	bureaus: Vec<BureauEx>,
 	max: usize,
-	bureau_options: BureauConfig,
+	bureau_config: BureauConfig,
 }
 
 impl BureauManager {
 	const BIND_ADDR: SocketAddrV4 = SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0);
 
-	pub fn new(max: usize, bureau_options: BureauConfig) -> Self {
+	pub fn new(wrl: String, max: usize, bureau_config: BureauConfig) -> Self {
 		Self {
+			wrl,
 			bureaus: Vec::with_capacity(max),
 			max,
-			bureau_options,
+			bureau_config,
 		}
 	}
 
@@ -45,7 +47,10 @@ impl BureauManager {
 		}
 
 		if self.bureaus.len() < self.max {
-			let bureau = Bureau::new(Self::BIND_ADDR, self.bureau_options.clone()).ok()?;
+			let mut config = self.bureau_config.clone();
+			config.wrl = Some(self.wrl.clone());
+
+			let bureau = Bureau::new(Self::BIND_ADDR, config).ok()?;
 			let port = bureau.port();
 
 			self.bureaus.push(BureauEx {

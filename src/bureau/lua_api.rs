@@ -10,7 +10,7 @@ use mlua::{ChunkMode, FromLuaMulti, Function, IntoLuaMulti, Lua, RegistryKey, Ta
 use super::{
 	math::{Mat3, Vector3},
 	protocol::{ByteWriter, MsgCommon, Strategy},
-	user_list::{AwesomeCell, UserList},
+	user_list::{AwesomeCell, UserList}, BureauConfig,
 };
 
 struct Funcs {
@@ -196,8 +196,18 @@ fn load_plugins(lua: &mut Lua) -> io::Result<()> {
 }
 
 impl LuaApi {
-	pub fn new(user_list: AwesomeCell<UserList>) -> mlua::Result<Self> {
+	pub fn new(user_list: AwesomeCell<UserList>, config: &BureauConfig) -> mlua::Result<Self> {
 		let mut lua = unsafe { Lua::unsafe_new() };
+
+		let config_tbl = lua.create_table()?;
+		if let Some(wrl) = &config.wrl {
+			config_tbl.set("wrl", wrl.as_str())?;
+		}
+		config_tbl.set("max_users", config.max_users)?;
+
+		let globals = lua.globals();
+		let package_loaded = globals.get::<Table>("package")?.get::<Table>("loaded")?;
+		package_loaded.set("config", config_tbl)?;
 
 		let funcs = Funcs::init(&mut lua, user_list)?;
 		load_plugins(&mut lua)?;

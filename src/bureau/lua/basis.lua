@@ -24,7 +24,7 @@ end
 
 --- Sets values based on a given angle. Only use this function on a new basis.
 ---@param r number Yaw in radians.
-function basis:fromYaw(r)
+function basis:from_yaw(r)
 	local s = math.sin(r)
 	local c = math.cos(r)
 
@@ -34,17 +34,9 @@ function basis:fromYaw(r)
 	self[9] = c
 end
 
---- Multiplies every value in the basis by n.
----@param n number
-function basis:scale(n)
-	for i = 1, 9 do
-		self[i] = self[i] * n
-	end
-end
-
 --- Gets scale of the basis.
 ---@return Vector
-function basis:getScale()
+function basis:scale()
 	return Vector(
 		math.sqrt(self[1]^2 + self[4]^2 + self[7]^2),
 		math.sqrt(self[2]^2 + self[5]^2 + self[8]^2),
@@ -52,10 +44,18 @@ function basis:getScale()
 	)
 end
 
+--- Multiplies every value in the basis by n.
+---@param n number
+function basis:scale_by(n)
+	for i = 1, 9 do
+		self[i] = self[i] * n
+	end
+end
+
 --- Sets the scale of the basis.
 ---@param v Vector
-function basis:setScale(v)
-	local s = self:getScale()
+function basis:set_scale(v)
+	local s = self:scale()
 
 	self[1] = self[1] / s[1] * v[1]
 	self[2] = self[2] / s[1] * v[1]

@@ -22,6 +22,7 @@ pub struct BureauConfig {
 	pub connect_timeout: u64,
 	pub max_users: i32,
 	pub aura_radius: f32,
+	pub wrl: Option<String>,
 }
 
 pub struct Bureau {
@@ -44,7 +45,7 @@ impl Bureau {
 		);
 
 		let user_list = AwesomeCell::new(UserList::new(config.max_users));
-		let lua_api = LuaApi::new(user_list.clone())?;
+		let lua_api = LuaApi::new(user_list.clone(), &config)?;
 		let listener = Listener::new(addr, config.connect_timeout)?;
 
 		Ok(Self {

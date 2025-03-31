@@ -51,6 +51,7 @@ fn main() {
 		connect_timeout: args.connect_timeout,
 		max_users: args.max_users,
 		aura_radius: args.aura_radius,
+		wrl: None,
 	};
 
 	if args.wls {
