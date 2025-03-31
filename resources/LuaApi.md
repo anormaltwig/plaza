@@ -4,27 +4,31 @@ Lua api for bureau plugins.
 
 ## hook
 
-`hook.onThink(fn: fun())`
+```lua
+local hook = require("hook")
+```
 
-`hook.onUserConnect(fn: fun(addr: string):boolean?)`
+`hook.think(fn: fun())`
 
-`hook.onNewUser(fn: fun())`
+`hook.user_connect(fn: fun(addr: string):boolean?)`
 
-`hook.onPositionUpdate(fn: fun(user: User, pos: Vector))`
+`hook.new_user(fn: fun(user: User, name: string, avatar: string))`
 
-`hook.onTransformUpdate(fn: fun(user: User))`
+`hook.position_update(fn: fun(user: User, pos: Vector))`
 
-`hook.onChatSend(fn: fun(user: User, msg: string):string?)`
+`hook.transform_update(fn: fun(user: User))`
 
-`hook.onNameChange(fn: fun(user: User, name: string, old: string))`
+`hook.chat_send(fn: fun(user: User, msg: string):string?)`
 
-`hook.onAvatarChange(fn: fun(user: User, avatar: string, old: string))`
+`hook.name_change(fn: fun(user: User, name: string, old: string))`
 
-`hook.onPrivateChat(fn: fun(sender: User, receiver: User, msg: string):string?)`
+`hook.avatar_change(fn: fun(user: User, avatar: string, old: string))`
 
-`hook.onUserDisconnect(fn: fun(user: User))`
+`hook.private_chat(fn: fun(sender: User, receiver: User, msg: string):string?)`
 
-`hook.onPluginsLoaded(fn: fun())`
+`hook.user_disconnect(fn: fun(user: User))`
+
+`hook.plugins_loaded(fn: fun())`
 
 ## User
 
@@ -32,47 +36,55 @@ Lua api for bureau plugins.
 
 Disconnect the user from the bureau.
 
-`User:setPos(pos: Vector)`
+`User:set_pos(pos: Vector)`
 
 Set User's position.
 
-`User:getPos() -> Vector`
+`User:pos() -> Vector`
 
 Get User's position.
 
-`User:setRot(rot: Basis)`
+`User:set_rot(rot: Basis)`
 
 Set User's rotation.
 
-`User:getRot() -> Basis`
+`User:rot() -> Basis`
 
 Get User's rotation.
 
-`User:sendMsg(msg: string)`
+`User:send_msg(msg: string)`
 
 Send a message to the User's chat.
 
-## user_manager
+## users
 
-`user_manager.getAll() -> User[]`
+```lua
+local users = require("users")
+```
+
+`users.all() -> User[]`
 
 Get all connected users.
 
-`user_manager.get(id: number) -> User`
+`users.get(id: number) -> User`
 
 Get user by their id.
 
 ## Vector
 
-`Vector:getLengthSqr() -> number`
+```lua
+local Vector = require("vector")
+```
+
+`Vector:length_sqr() -> number`
 
 Get the length of the vector squared. (Faster than getting the actual length)
 
-`Vector:getLength() -> number`
+`Vector:length() -> number`
 
 Get the length of the vector.
 
-`Vector:getNormalized() -> Vector`
+`Vector:normalized() -> Vector`
 
 Create a new vector with the same direction but a length of 1.
 
@@ -90,23 +102,27 @@ Create a new vector, you can get x, y, and z components by indexing 1, 2, and 3 
 
 ## Basis
 
+```lua
+local Basis = require("basis")
+```
+
 `Basis:set(arr: number[])`
 
 Set values of the basis.
 
-`Basis:fromYaw(r)`
+`Basis:from_yaw(r)`
 
 Set values based on a given angle. Only use this function on a new basis.
 
-`Basis:scale(n)`
-
-Multiplies every value in the basis by n.
-
-`Basis:getScale() -> Vector`
+`Basis:scale() -> Vector`
 
 Gets scale of the basis.
 
-`Basis:setScale(v)`
+`Basis:scale_by(n)`
+
+Multiplies every value in the basis by n.
+
+`Basis:set_scale(v)`
 
 Sets the scale of the basis.
 
