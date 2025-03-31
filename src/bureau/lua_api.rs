@@ -10,7 +10,8 @@ use mlua::{ChunkMode, FromLuaMulti, Function, IntoLuaMulti, Lua, RegistryKey, Ta
 use super::{
 	math::{Mat3, Vector3},
 	protocol::{ByteWriter, MsgCommon, Strategy},
-	user_list::{AwesomeCell, UserList}, BureauConfig,
+	user_list::{AwesomeCell, UserList},
+	BureauConfig,
 };
 
 struct Funcs {
