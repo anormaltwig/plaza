@@ -126,7 +126,7 @@ impl Funcs {
 		lua.load(include_str!("lua/basis.lua")).exec()?;
 
 		let (users, user_meta): (Table, Table) =
-			lua.load(include_str!("lua/user.lua")).call(tbl)?;
+			lua.load(include_str!("lua/users.lua")).call(tbl)?;
 
 		let tbl: Table = lua
 			.load(include_str!("lua/hook.lua"))

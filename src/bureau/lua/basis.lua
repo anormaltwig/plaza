@@ -1,11 +1,8 @@
 local Vector = require("vector")
 
----@class Basis
 local basis = {}
 basis.__index = basis
 
---- Create a new basis.
----@return Basis
 local function Basis()
 	return setmetatable({
 		1, 0, 0,
@@ -14,16 +11,12 @@ local function Basis()
 	}, basis)
 end
 
---- Set values of the basis.
----@param arr number[]
 function basis:set(arr)
 	for i = 1, 9 do
 		self[i] = arr[i] or 0
 	end
 end
 
---- Sets values based on a given angle. Only use this function on a new basis.
----@param r number Yaw in radians.
 function basis:from_yaw(r)
 	local s = math.sin(r)
 	local c = math.cos(r)
@@ -34,8 +27,6 @@ function basis:from_yaw(r)
 	self[9] = c
 end
 
---- Gets scale of the basis.
----@return Vector
 function basis:scale()
 	return Vector(
 		math.sqrt(self[1]^2 + self[4]^2 + self[7]^2),
@@ -44,16 +35,12 @@ function basis:scale()
 	)
 end
 
---- Multiplies every value in the basis by n.
----@param n number
 function basis:scale_by(n)
 	for i = 1, 9 do
 		self[i] = self[i] * n
 	end
 end
 
---- Sets the scale of the basis.
----@param v Vector
 function basis:set_scale(v)
 	local s = self:scale()
 
@@ -70,8 +57,6 @@ function basis:set_scale(v)
 	self[9] = self[9] / s[3] * v[3]
 end
 
---- Clones the basis.
----@return Basis
 function basis:clone()
 	local rot = Basis()
 	rot:set(self)

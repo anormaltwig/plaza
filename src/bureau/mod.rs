@@ -30,7 +30,6 @@ pub struct Bureau {
 	config: BureauConfig,
 	listener: Listener,
 	user_list: AwesomeCell<UserList>,
-
 	lua_api: LuaApi,
 }
 

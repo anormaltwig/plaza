@@ -1,15 +1,7 @@
----@class Vector
----@field x number
----@field y number
----@field z number
 local vec = {}
 vec.__index = vec
 
 --- Create a new vector, you can get x, y, and z components by indexing 1, 2, and 3 respectively.
----@param x number
----@param y number
----@param z number
----@return Vector
 local function Vector(x, y, z)
 	return setmetatable({x or 0, y or 0, z or 0}, vec)
 end
@@ -54,26 +46,19 @@ function vec.__eq(a, b)
 	return a[1] == b[1] and a[2] == b[2] and a[3] == b[3]
 end
 
---- Get the length of the vector squared. (Faster than getting the actual length)
----@return number
 function vec:length_sqr()
 	return self[1]^2 + self[2]^2 + self[3]^2
 end
 
---- Get the length of the vector.
----@return number
 function vec:length()
 	return math.sqrt(self[1]^2 + self[2]^2 + self[3]^2)
 end
 
---- Create a new vector with the same direction but a length of 1.
----@return Vector
 function vec:normalized()
 	local len = math.sqrt(self[1]^2 + self[2]^2 + self[3]^2)
 	return Vector(self[1] / len, self[2] / len, self[3] / len)
 end
 
---- Modify the vector so that its length is 1.
 function vec:normalize()
 	local len = math.sqrt(self[1]^2 + self[2]^2 + self[3]^2)
 
@@ -82,7 +67,6 @@ function vec:normalize()
 	self[3] = self[3] / len
 end
 
---- Clone vector.
 function vec:clone()
 	return Vector(self[1], self[2], self[3])
 end
