@@ -25,6 +25,7 @@ struct Args {
 	#[arg(short, long, default_value_t = 5126, value_parser = clap::value_parser!(u16).range(1..))]
 	port: u16,
 
+	/// Time to wait before disconnecting incoming clients.
 	#[arg(long, default_value_t = 10)]
 	connect_timeout: u64,
 
