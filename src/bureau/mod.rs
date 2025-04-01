@@ -37,7 +37,7 @@ pub struct Bureau {
 #[allow(unused_mut)]
 #[allow(dropping_references)]
 impl Bureau {
-	pub fn new(addr: SocketAddrV4, config: BureauConfig) -> self::Result<Self> {
+	pub fn new(addr: &SocketAddrV4, config: BureauConfig) -> self::Result<Self> {
 		assert!(
 			config.max_users > 0,
 			"max_users config option wasn't positive ({})",

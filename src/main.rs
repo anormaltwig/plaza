@@ -72,7 +72,7 @@ fn main() {
 	}
 
 	println!("Running Bureau on port '{}.'", args.port);
-	Bureau::new(addr, bureau_config)
+	Bureau::new(&addr, bureau_config)
 		.expect("failed to create bureau")
 		.run();
 }
