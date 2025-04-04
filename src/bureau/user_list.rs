@@ -48,7 +48,7 @@ impl UserList {
 
 	#[rustfmt::skip]
 	const REJECT_BUF: [u8; 14] = [
-		b'r', b'e', b'j', b'e', b'c', b't', 1,
+		b'r', b'e', b'j', b'e', b'c', b't', 0,
 		0, 0, 0, 0, 0, 0, 0,
 	];
 
