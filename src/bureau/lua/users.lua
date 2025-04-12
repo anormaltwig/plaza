@@ -48,7 +48,6 @@ end
 
 local users = {}
 
----@class userslib
 local user_manager = {}
 
 function user_manager.all()
