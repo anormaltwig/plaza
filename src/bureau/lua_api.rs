@@ -8,10 +8,10 @@ use std::{
 use mlua::{ChunkMode, FromLuaMulti, Function, IntoLuaMulti, Lua, RegistryKey, Table};
 
 use super::{
+	BureauConfig,
 	math::{Mat3, Vector3},
 	protocol::{ByteWriter, MsgCommon, Strategy},
 	user_list::{AwesomeCell, UserList},
-	BureauConfig,
 };
 
 struct Funcs {

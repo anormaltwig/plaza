@@ -59,7 +59,8 @@ pub fn run<A: ToSocketAddrs>(addr: A, options: WlsOptions) -> io::Result<()> {
 	println!("WLS running on port: {}.", wls_port);
 	loop {
 		if let Ok((socket, _)) = listener.accept()
-			&& let Ok(()) = socket.set_nonblocking(true) {
+			&& let Ok(()) = socket.set_nonblocking(true)
+		{
 			queue.push((Instant::now(), socket));
 		}
 
