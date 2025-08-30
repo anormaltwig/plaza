@@ -1,7 +1,7 @@
 [package]
 name = "plaza"
 version = "0.7.0"
-edition = "2021"
+edition = "2024"
 
 [profile.dev.package."*"]
 opt-level = 2

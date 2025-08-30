@@ -39,7 +39,7 @@ struct BureauArgs {
 	aura_radius: f32,
 
 	/// Amount of time to wait before disconnecting connecting users
-	#[arg(short, long, default_value_t = 10)]
+	#[arg(long, default_value_t = 10)]
 	connect_timeout: u64,
 
 	/// Max players per bureau
@@ -54,7 +54,7 @@ struct BureauArgs {
 #[derive(Args)]
 struct WlsArgs {
 	/// Host name or IP address to use for WLS responses
-	#[arg(short, long, default_value_t = ("127.0.0.1").to_string())]
+	#[arg(short = 'n', long, default_value_t = ("127.0.0.1").to_string())]
 	host_name: String,
 
 	/// Max bureaus per wrl
@@ -62,7 +62,7 @@ struct WlsArgs {
 	max_bureaus: usize,
 
 	/// Max players per bureau
-	#[arg(short, long)]
+	#[arg(long)]
 	wrl_list: Option<String>,
 }
 

@@ -69,10 +69,9 @@ impl UserList {
 			id_bytes[0], id_bytes[1], id_bytes[2], id_bytes[3],
 		];
 
-		if let Ok(n) = stream.write(&buf) {
-			if n != buf.len() {
-				return Ok(false);
-			}
+		if let Ok(n) = stream.write(&buf) 
+			&& n != buf.len() {
+			return Ok(false);
 		}
 		self.users.insert(id, User::new(id, stream)?);
 
