@@ -10,23 +10,25 @@ pub enum ListenerEvent {
 }
 
 pub struct Listener {
+	listener: TcpListener,
 	port: u16,
 	timeout: u64,
-	listener: TcpListener,
+	max_queue: usize,
 	queue: Vec<(TcpStream, Instant)>,
 }
 
 impl Listener {
-	pub fn new<A: ToSocketAddrs>(addr: A, timeout: u64) -> io::Result<Self> {
+	pub fn new<A: ToSocketAddrs>(addr: A, timeout: u64, max_queue: usize) -> io::Result<Self> {
 		let listener = TcpListener::bind(addr)?;
 		listener.set_nonblocking(true)?;
 
 		let port = listener.local_addr()?.port();
 
 		Ok(Self {
+			listener,
 			port,
 			timeout,
-			listener,
+			max_queue,
 			queue: Vec::new(),
 		})
 	}
@@ -42,17 +44,19 @@ impl Listener {
 	pub fn poll_event(&mut self) -> io::Result<Option<ListenerEvent>> {
 		match self.listener.accept() {
 			Ok((stream, addr)) => {
-				stream.set_nonblocking(true)?;
-				self.queue.push((stream, Instant::now()));
+				if self.queue.len() < self.max_queue {
+					stream.set_nonblocking(true)?;
+					self.queue.push((stream, Instant::now()));
 
-				return Ok(Some(ListenerEvent::Incoming(addr)));
+					return Ok(Some(ListenerEvent::Incoming(addr)));
+				}
 			}
 			Err(e) if e.kind() == ErrorKind::WouldBlock => (),
 			Err(e) => return Err(e),
 		}
 
 		let mut index = 0;
-		'outer: while index < self.queue.len() {
+		while index < self.queue.len() {
 			let (stream, connect_time) = &mut self.queue[index];
 
 			if connect_time.elapsed().as_secs() > self.timeout {
@@ -81,11 +85,9 @@ impl Listener {
 				continue;
 			}
 
-			for (i, b) in buf.iter().enumerate() {
-				// last two bytes are VSCP version (major then minor)
-				if *b != b"hello\x01\x01"[i] {
-					continue 'outer;
-				}
+			// last two bytes are VSCP version (major then minor)
+			if buf.cmp(b"hello\x01\x01").is_ne() {
+				continue;
 			}
 
 			return Ok(Some(ListenerEvent::Accepted(stream)));

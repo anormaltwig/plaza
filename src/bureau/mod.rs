@@ -1,4 +1,4 @@
-use std::{io, net::SocketAddrV4, thread, time::Duration};
+use std::{io, net::ToSocketAddrs, thread, time::Duration};
 
 use listener::{Listener, ListenerEvent};
 use lua_api::LuaApi;
@@ -21,6 +21,7 @@ pub use error::*;
 pub struct BureauConfig {
 	pub connect_timeout: u64,
 	pub max_users: i32,
+	pub max_queue: usize,
 	pub aura_radius: f32,
 	pub wrl: Option<String>,
 }
@@ -36,7 +37,7 @@ pub struct Bureau {
 #[allow(unused_mut)]
 #[allow(dropping_references)]
 impl Bureau {
-	pub fn new(addr: &SocketAddrV4, config: BureauConfig) -> self::Result<Self> {
+	pub fn new<A: ToSocketAddrs>(addr: A, config: BureauConfig) -> self::Result<Self> {
 		assert!(
 			config.max_users > 0,
 			"max_users config option wasn't positive ({})",
@@ -45,7 +46,7 @@ impl Bureau {
 
 		let user_list = AwesomeCell::new(UserList::new(config.max_users));
 		let lua_api = LuaApi::new(user_list.clone(), &config)?;
-		let listener = Listener::new(addr, config.connect_timeout)?;
+		let listener = Listener::new(addr, config.connect_timeout, config.max_queue)?;
 
 		Ok(Self {
 			port: listener.port(),

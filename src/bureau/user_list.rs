@@ -1,5 +1,4 @@
 use std::{
-	collections::HashMap,
 	io::{self, Write},
 	net::TcpStream,
 	rc::Rc,
@@ -11,6 +10,8 @@ use std::cell::UnsafeCell;
 #[cfg(debug_assertions)]
 use std::cell::{Ref, RefCell, RefMut};
 
+use hashbrown::HashMap;
+
 use super::{
 	protocol::{ByteWriter, Opcode},
 	user::User,
@@ -18,6 +19,7 @@ use super::{
 
 pub struct UserList {
 	pub users: HashMap<i32, User>,
+
 	master_id: i32,
 
 	max_index: i32,
@@ -62,7 +64,7 @@ impl UserList {
 
 		#[rustfmt::skip]
 		let buf = [
-			b'h', b'e', b'l', b'l', b'o', 69,
+			b'h', b'e', b'l', b'l', b'o', 69, // glorious unused 6th byte
 			id_bytes[0], id_bytes[1], id_bytes[2], id_bytes[3],
 			id_bytes[0], id_bytes[1], id_bytes[2], id_bytes[3],
 		];

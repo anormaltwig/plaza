@@ -1,6 +1,6 @@
 [package]
-name = "spark"
-version = "0.6.1"
+name = "plaza"
+version = "0.7.0"
 edition = "2021"
 
 [profile.dev.package."*"]
@@ -14,4 +14,5 @@ codegen-units = 1
 
 [dependencies]
 clap = { version = "4.5.27", features = ["derive"] }
-mlua = { version = "0.10.3", features = ["luajit", "vendored"] }
+hashbrown = "0.16.0"
+mlua = { version = "0.11.3", features = ["luajit", "vendored"] }

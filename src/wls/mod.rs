@@ -1,15 +1,15 @@
 mod bureau_manager;
 
 use std::{
-	collections::HashMap,
 	fs::File,
 	io::{self, BufRead, BufReader, ErrorKind, Read, Write},
-	net::{SocketAddrV4, TcpListener},
+	net::{TcpListener, ToSocketAddrs},
 	thread,
 	time::{Duration, Instant},
 };
 
 use bureau_manager::BureauManager;
+use hashbrown::HashMap;
 
 use crate::bureau::BureauConfig;
 
@@ -32,11 +32,12 @@ fn default_wrls() -> Vec<String> {
 	]
 }
 
-pub fn run(addr: SocketAddrV4, options: WlsOptions) -> io::Result<()> {
+pub fn run<A: ToSocketAddrs>(addr: A, options: WlsOptions) -> io::Result<()> {
 	let listener = TcpListener::bind(addr)?;
 	listener.set_nonblocking(true)?;
 	let wls_port = listener.local_addr()?.port();
 
+	// Check wrl_list and read file if it's set
 	let wrls = match &options.wrl_list {
 		Some(path) => {
 			let reader = BufReader::new(File::open(path)?);

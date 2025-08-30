@@ -50,7 +50,7 @@ impl BureauManager {
 			let mut config = self.bureau_config.clone();
 			config.wrl = Some(self.wrl.clone());
 
-			let bureau = Bureau::new(&Self::BIND_ADDR, config).ok()?;
+			let bureau = Bureau::new(Self::BIND_ADDR, config).ok()?;
 			let port = bureau.port();
 
 			self.bureaus.push(BureauEx {

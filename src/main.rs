@@ -1,5 +1,5 @@
-use clap::Parser;
-use std::net::{Ipv4Addr, SocketAddrV4};
+use clap::{Args, Parser, Subcommand};
+use std::net::{IpAddr, SocketAddr};
 
 use bureau::{Bureau, BureauConfig};
 use wls::WlsOptions;
@@ -8,72 +8,96 @@ mod bureau;
 mod wls;
 
 #[derive(Parser)]
-struct Args {
-	/// If set, program will function in WLS mode.
-	#[arg(short, long)]
-	wls: bool,
+struct Cli {
+	/// IP to bind to
+	#[arg(long, default_value = "0.0.0.0")]
+	ip: IpAddr,
 
-	/// File path to a newline seperated list of wrls to allow in WLS mode.
-	#[arg(long)]
-	wrl_list: Option<String>,
-
-	/// IP or Domain of the server.
-	#[arg(long, default_value_t = ("127.0.0.1").into())]
-	host_name: String,
-
-	/// Bureau/WLS port.
-	#[arg(short, long, default_value_t = 5126, value_parser = clap::value_parser!(u16).range(1..))]
+	/// Port to bind to
+	#[arg(short, long, default_value_t = 5126)]
 	port: u16,
 
-	/// Time to wait before disconnecting incoming clients.
-	#[arg(long, default_value_t = 10)]
-	connect_timeout: u64,
+	#[command(flatten)]
+	bureau: BureauArgs,
 
-	/// Maximum number of bureaus per wrl to create in WLS mode.
-	#[arg(long, default_value_t = 3)]
-	max_bureaus: usize,
+	#[command(subcommand)]
+	command: CliCommand,
+}
 
-	/// Maximum number of users that each Bureau can have.
-	#[arg(short, long, default_value_t = 256)]
-	max_users: i32,
+#[derive(Subcommand)]
+enum CliCommand {
+	/// Run a single bureau
+	Bureau,
+	/// Run in WLS mode (multiple bureaus for multiple wrls)
+	Wls(WlsArgs),
+}
 
-	/// Radius to add two users to each others aura.
+#[derive(Args)]
+struct BureauArgs {
+	/// Amount of time to wait before disconnecting connecting users
 	#[arg(short, long, default_value_t = 200.0)]
 	aura_radius: f32,
+
+	/// Amount of time to wait before disconnecting connecting users
+	#[arg(short, long, default_value_t = 10)]
+	connect_timeout: u64,
+
+	/// Max players per bureau
+	#[arg(short, long, default_value_t = 255)]
+	max_users: i32,
+
+	/// Max number of incoming connections to allow
+	#[arg(long, default_value_t = 10)]
+	max_queue: usize,
+}
+
+#[derive(Args)]
+struct WlsArgs {
+	/// Host name or IP address to use for WLS responses
+	#[arg(short, long, default_value_t = ("127.0.0.1").to_string())]
+	host_name: String,
+
+	/// Max bureaus per wrl
+	#[arg(short, long, default_value_t = 2)]
+	max_bureaus: usize,
+
+	/// Max players per bureau
+	#[arg(short, long)]
+	wrl_list: Option<String>,
 }
 
 fn main() {
-	let args = Args::parse();
+	let cli = Cli::parse();
 
-	let ip = Ipv4Addr::new(0, 0, 0, 0);
-	let addr = SocketAddrV4::new(ip, args.port);
+	let addr = SocketAddr::new(cli.ip, cli.port);
 
 	let bureau_config = BureauConfig {
-		connect_timeout: args.connect_timeout,
-		max_users: args.max_users,
-		aura_radius: args.aura_radius,
+		connect_timeout: cli.bureau.connect_timeout,
+		max_users: cli.bureau.max_users,
+		max_queue: cli.bureau.max_queue,
+		aura_radius: cli.bureau.aura_radius,
 		wrl: None,
 	};
 
-	if args.wls {
-		let err = wls::run(
-			addr,
-			WlsOptions {
-				host_name: args.host_name,
-				max_bureaus: args.max_bureaus,
-				wrl_list: args.wrl_list,
-				bureau_config,
-			},
-		)
-		.unwrap_err();
+	match cli.command {
+		CliCommand::Bureau => {
+			println!("Running Bureau on port '{}.'", cli.port);
 
-		eprintln!("Error running WLS: {}", err);
-
-		return;
+			Bureau::new(addr, bureau_config)
+				.expect("bureau creation")
+				.run();
+		}
+		CliCommand::Wls(args) => {
+			wls::run(
+				addr,
+				WlsOptions {
+					host_name: args.host_name,
+					max_bureaus: args.max_bureaus,
+					wrl_list: args.wrl_list,
+					bureau_config,
+				},
+			)
+			.expect("running wls");
+		}
 	}
-
-	println!("Running Bureau on port '{}.'", args.port);
-	Bureau::new(&addr, bureau_config)
-		.expect("failed to create bureau")
-		.run();
 }

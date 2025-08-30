@@ -52,7 +52,7 @@ After the initial hello packet is sent by a client the server will respond with 
 | Name | Bytes | Type | Description |
 | --- | --- | --- | --- |
 | Hello | 6 | data | `hello\0` when accepted or `reject` if rejected |
-| ??? | 4 | int32 | Unknown uint32, seems to always be 0 |
+| ??? | 4 | int32 | Unknown int32, seems to always be 0 |
 | Connection ID | 4 | int32 | Client's unique ID |
 
 ## Packets
