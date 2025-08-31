@@ -1,3 +1,7 @@
+# Project moved to codeberg
+
+https://codeberg.org/anormaltwig/plaza
+
 # Plaza
 
 <img src="resources/logo.png" height="200">
